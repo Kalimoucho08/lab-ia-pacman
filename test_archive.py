@@ -1,0 +1,39 @@
+import sys
+sys.path.insert(0, '.')
+from log_archiver import compress_text_log, merge_tensorboard_logs, archive_simulation_logs
+import os
+
+# Test compression texte
+test_log = 'logs/test_archive.log'
+with open(test_log, 'w') as f:
+    f.write('Test log line\n' * 10)
+print(f"Créé {test_log}")
+compressed = compress_text_log(test_log, keep_original=False)
+print(f"Compressé en {compressed}")
+
+# Test fusion TensorBoard (skip si TensorFlow absent)
+try:
+    import tensorflow as tf
+    has_tf = True
+except ImportError:
+    has_tf = False
+    print("TensorFlow non installé, skip fusion")
+
+if has_tf and os.path.exists('logs/DQN_0'):
+    merged = merge_tensorboard_logs('logs/DQN_0')
+    if merged:
+        print(f"Fusionné en {merged}")
+
+# Test archivage simulation
+archive = archive_simulation_logs(simulation_id='DQN_0', log_dir='logs')
+if archive:
+    print(f"Archive créée: {archive}")
+    # Vérifier que l'archive existe
+    if os.path.exists(archive):
+        print("Archive valide")
+    else:
+        print("Archive manquante")
+else:
+    print("Échec archivage")
+
+print("Test terminé.")

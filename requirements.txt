@@ -9,6 +9,8 @@ pytest>=7.0.0
 gymnasium>=0.29.0
 stable-baselines3>=2.0.0
 torch>=2.0.0
+pettingzoo>=1.24.0
+supersuit>=3.8.0  # wrappers pour PettingZoo
 
 # Interface graphique (remplacement de pygame par pygame-ce pour meilleure compatibilité)
 pygame-ce>=2.5.0

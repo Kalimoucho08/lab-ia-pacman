@@ -1,0 +1,29 @@
+Collecting pettingzoo
+  Downloading pettingzoo-1.24.3-py3-none-any.whl.metadata (8.5 kB)
+Collecting supersuit
+  Downloading supersuit-3.10.0-py3-none-any.whl.metadata (3.1 kB)
+Requirement already satisfied: numpy>=1.21.0 in c:\python314\lib\site-packages (from pettingzoo) (2.4.0)
+Requirement already satisfied: gymnasium>=0.28.0 in c:\python314\lib\site-packages (from pettingzoo) (1.2.3)
+Collecting tinyscaler>=1.2.6 (from supersuit)
+  Downloading tinyscaler-1.2.8.tar.gz (156 kB)
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Getting requirements to build wheel: started
+  Getting requirements to build wheel: finished with status 'done'
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Requirement already satisfied: cloudpickle>=1.2.0 in c:\python314\lib\site-packages (from gymnasium>=0.28.0->pettingzoo) (3.1.2)
+Requirement already satisfied: typing-extensions>=4.3.0 in c:\python314\lib\site-packages (from gymnasium>=0.28.0->pettingzoo) (4.15.0)
+Requirement already satisfied: farama-notifications>=0.0.1 in c:\python314\lib\site-packages (from gymnasium>=0.28.0->pettingzoo) (0.0.4)
+Downloading pettingzoo-1.24.3-py3-none-any.whl (847 kB)
+   ---------------------------------------- 847.8/847.8 kB 12.7 MB/s  0:00:00
+Downloading supersuit-3.10.0-py3-none-any.whl (50 kB)
+Building wheels for collected packages: tinyscaler
+  Building wheel for tinyscaler (pyproject.toml): started
+  Building wheel for tinyscaler (pyproject.toml): finished with status 'done'
+  Created wheel for tinyscaler: filename=tinyscaler-1.2.8-cp314-cp314-win_amd64.whl size=79748 sha256=99e5c97d7862eb96db3b7c65a97560749139a3cf66110e56db1952b8276b5861
+  Stored in directory: c:\users\jdema\appdata\local\pip\cache\wheels\19\b2\81\40660ade5155f4ec8641dc52ab477f0e4452e85833aabd2833
+Successfully built tinyscaler
+Installing collected packages: tinyscaler, supersuit, pettingzoo
+
+Successfully installed pettingzoo-1.24.3 supersuit-3.10.0 tinyscaler-1.2.8
