@@ -1,0 +1,90 @@
+/* Styles spécifiques à l'application */
+
+.app-container {
+  min-height: 100vh;
+}
+
+/* Animation pour les éléments interactifs */
+.interactive {
+  transition: all 0.2s ease-in-out;
+}
+
+.interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* Styles pour les cartes */
+.card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+/* Styles pour les boutons d'action */
+.action-button {
+  background: linear-gradient(135deg, #00bcd4 0%, #008394 100%);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.action-button:hover {
+  background: linear-gradient(135deg, #33c9dc 0%, #00bcd4 100%);
+  transform: scale(1.05);
+}
+
+.action-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Styles pour les curseurs */
+.slider-container {
+  padding: 16px 0;
+}
+
+.slider-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.slider-value {
+  font-family: 'Source Code Pro', monospace;
+  background: rgba(0, 188, 212, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+/* Styles pour les graphiques */
+.chart-container {
+  position: relative;
+  height: 200px;
+  width: 100%;
+}
+
+/* Styles pour le canvas de jeu */
+.game-canvas {
+  border-radius: 8px;
+  background: #000;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+/* Responsive adjustments */
+@media (max-width: 900px) {
+  .grid-container {
+    flex-direction: column;
+  }
+  
+  .chart-container {
+    height: 150px;
+  }
+}

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Module pour la compression et la consolidation des logs.
-Fournit des fonctions pour compresser les logs texte et fusionner les logs TensorBoard.
+Fournit des fonctions pour compresser les logs texte et archiver les simulations.
 """
 import gzip
 import shutil
@@ -11,6 +11,7 @@ import tempfile
 import threading
 from datetime import datetime
 from pathlib import Path
+import zipfile
 
 def compress_text_log(log_path, keep_original=True):
     """
@@ -37,52 +38,6 @@ def compress_text_log(log_path, keep_original=True):
         print(f"Erreur lors de la compression de {log_path}: {e}")
         return None
 
-def merge_tensorboard_logs(log_dir, output_file=None):
-    """
-    Fusionne tous les fichiers d'événements TensorBoard (*.tfevents*) d'un répertoire
-    en un seul fichier. Utilise l'outil `tensorboard.summary.merge` si disponible.
-
-    Args:
-        log_dir (str): Répertoire contenant les fichiers d'événements.
-        output_file (str): Chemin du fichier de sortie. Si None, génère un nom automatique.
-
-    Returns:
-        str: Chemin du fichier fusionné, ou None si échec.
-    """
-    try:
-        # Essayer d'importer tensorflow pour utiliser tf.summary.merge
-        import tensorflow as tf
-    except ImportError:
-        print("TensorFlow non installé, impossible de fusionner les logs TensorBoard.")
-        print("Installez TensorFlow avec: pip install tensorflow")
-        return None
-    
-    event_files = glob.glob(os.path.join(log_dir, '*.tfevents*'))
-    if not event_files:
-        print(f"Aucun fichier d'événements trouvé dans {log_dir}")
-        return None
-    
-    if output_file is None:
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        output_file = os.path.join(log_dir, f'merged_events_{timestamp}.tfevents')
-    
-    try:
-        # Créer un writer de sortie
-        with tf.summary.create_file_writer(os.path.dirname(output_file)) as writer:
-            # Lire tous les événements de chaque fichier
-            for event_file in event_files:
-                for event in tf.compat.v1.train.summary_iterator(event_file):
-                    # Réécrire chaque événement dans le writer unique
-                    for value in event.summary.value:
-                        tf.summary.scalar(value.tag, value.simple_value, step=event.step)
-        # Note: Cette approche est simplifiée et peut ne pas préserver tous les types de données.
-        # Une alternative plus robuste serait d'utiliser `tensorboard.summary.merge`.
-        print(f"Fusionné {len(event_files)} fichiers en {output_file}")
-        return output_file
-    except Exception as e:
-        print(f"Erreur lors de la fusion des logs TensorBoard: {e}")
-        return None
-
 def archive_simulation_logs(simulation_id=None, log_dir='logs', output_archive=None):
     """
     Crée une archive ZIP contenant tous les logs d'une simulation.
@@ -96,8 +51,6 @@ def archive_simulation_logs(simulation_id=None, log_dir='logs', output_archive=N
     Returns:
         str: Chemin de l'archive créée.
     """
-    import zipfile
-    
     if simulation_id is None:
         # Trouver le sous-répertoire le plus récent (par date de modification)
         subdirs = [d for d in os.listdir(log_dir) if os.path.isdir(os.path.join(log_dir, d))]
@@ -135,8 +88,6 @@ if __name__ == '__main__':
             f.write('Test log line\n')
         compressed = compress_text_log(test_log, keep_original=False)
         print(f"Compressed: {compressed}")
-        # Test de fusion (nécessite TensorFlow)
-        # merge_tensorboard_logs('logs/DQN_0')
         # Test d'archivage
         archive_simulation_logs()
     else:

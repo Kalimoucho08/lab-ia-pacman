@@ -154,10 +154,10 @@ class IALab:
         gamma = self.gamma_var.get()
         if algorithm == "DQN":
             model = DQN("MlpPolicy", self.env, learning_rate=lr, gamma=gamma,
-                        verbose=0, tensorboard_log="./logs/")
+                        verbose=0)
         else:  # PPO
             model = PPO("MlpPolicy", self.env, learning_rate=lr, gamma=gamma,
-                        verbose=0, tensorboard_log="./logs/")
+                        verbose=0)
         self.log(f"Modèle {algorithm} créé (LR={lr}, gamma={gamma})")
         return model
 

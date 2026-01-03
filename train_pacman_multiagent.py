@@ -38,15 +38,15 @@ def train_pacman(algorithm="DQN", total_timesteps=10000, power_duration=10, num_
 
     # Sélection de l'algorithme
     if algorithm == "DQN":
-        model = DQN("MlpPolicy", pacman_env, verbose=1, tensorboard_log="./logs/")
+        model = DQN("MlpPolicy", pacman_env, verbose=1)
     elif algorithm == "PPO":
-        model = PPO("MlpPolicy", pacman_env, verbose=1, tensorboard_log="./logs/")
+        model = PPO("MlpPolicy", pacman_env, verbose=1)
     elif algorithm == "A2C":
-        model = A2C("MlpPolicy", pacman_env, verbose=1, tensorboard_log="./logs/")
+        model = A2C("MlpPolicy", pacman_env, verbose=1)
     elif algorithm == "SAC":
-        model = SAC("MlpPolicy", pacman_env, verbose=1, tensorboard_log="./logs/")
+        model = SAC("MlpPolicy", pacman_env, verbose=1)
     elif algorithm == "TD3":
-        model = TD3("MlpPolicy", pacman_env, verbose=1, tensorboard_log="./logs/")
+        model = TD3("MlpPolicy", pacman_env, verbose=1)
     else:
         raise ValueError(f"Algorithme inconnu: {algorithm}")
 
@@ -92,15 +92,15 @@ def train_ghosts(algorithm="PPO", total_timesteps=10000, power_duration=10, num_
     ghost_env = DummyVecEnv([lambda: ghost_env])
 
     if algorithm == "DQN":
-        model = DQN("MlpPolicy", ghost_env, verbose=1, tensorboard_log="./logs/")
+        model = DQN("MlpPolicy", ghost_env, verbose=1)
     elif algorithm == "PPO":
-        model = PPO("MlpPolicy", ghost_env, verbose=1, tensorboard_log="./logs/")
+        model = PPO("MlpPolicy", ghost_env, verbose=1)
     elif algorithm == "A2C":
-        model = A2C("MlpPolicy", ghost_env, verbose=1, tensorboard_log="./logs/")
+        model = A2C("MlpPolicy", ghost_env, verbose=1)
     elif algorithm == "SAC":
-        model = SAC("MlpPolicy", ghost_env, verbose=1, tensorboard_log="./logs/")
+        model = SAC("MlpPolicy", ghost_env, verbose=1)
     elif algorithm == "TD3":
-        model = TD3("MlpPolicy", ghost_env, verbose=1, tensorboard_log="./logs/")
+        model = TD3("MlpPolicy", ghost_env, verbose=1)
     else:
         raise ValueError(f"Algorithme inconnu: {algorithm}")
 

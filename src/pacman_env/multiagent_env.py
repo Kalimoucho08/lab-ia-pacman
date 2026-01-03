@@ -114,6 +114,15 @@ class PacManMultiAgentEnv(ParallelEnv):
             agent: spaces.Box(low=0, high=1, shape=obs_shape, dtype=np.float32)
             for agent in self.agents
         }
+        
+        # Méthodes requises par PettingZoo ParallelEnv
+    def observation_space(self, agent):
+        """Retourne l'espace d'observation pour un agent donné."""
+        return self.observation_spaces[agent]
+    
+    def action_space(self, agent):
+        """Retourne l'espace d'action pour un agent donné."""
+        return self.action_spaces[agent]
 
         # État interne (sera initialisé dans reset)
         self.pacman_pos = None

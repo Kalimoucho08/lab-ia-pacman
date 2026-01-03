@@ -539,19 +539,19 @@ class IALabAdvanced:
             gamma = self.gamma_var.get()
             if algorithm == "DQN":
                 model = DQN("MlpPolicy", vec_env, learning_rate=lr, gamma=gamma,
-                            verbose=0, tensorboard_log="./logs/")
+                            verbose=0)
             elif algorithm == "PPO":
                 model = PPO("MlpPolicy", vec_env, learning_rate=lr, gamma=gamma,
-                            verbose=0, tensorboard_log="./logs/")
+                            verbose=0)
             elif algorithm == "A2C":
                 model = A2C("MlpPolicy", vec_env, learning_rate=lr, gamma=gamma,
-                            verbose=0, tensorboard_log="./logs/")
+                            verbose=0)
             elif algorithm == "SAC":
                 model = SAC("MlpPolicy", vec_env, learning_rate=lr, gamma=gamma,
-                            verbose=0, tensorboard_log="./logs/")
+                            verbose=0)
             elif algorithm == "TD3":
                 model = TD3("MlpPolicy", vec_env, learning_rate=lr, gamma=gamma,
-                            verbose=0, tensorboard_log="./logs/")
+                            verbose=0)
             else:
                 self.log(f"Algorithme {algorithm} non supporté.")
                 return
@@ -633,19 +633,19 @@ class IALabAdvanced:
             gamma = self.gamma_var.get()
             if algorithm == "DQN":
                 model = DQN("MlpPolicy", vec_env, learning_rate=lr, gamma=gamma,
-                            verbose=0, tensorboard_log="./logs/")
+                            verbose=0)
             elif algorithm == "PPO":
                 model = PPO("MlpPolicy", vec_env, learning_rate=lr, gamma=gamma,
-                            verbose=0, tensorboard_log="./logs/")
+                            verbose=0)
             elif algorithm == "A2C":
                 model = A2C("MlpPolicy", vec_env, learning_rate=lr, gamma=gamma,
-                            verbose=0, tensorboard_log="./logs/")
+                            verbose=0)
             elif algorithm == "SAC":
                 model = SAC("MlpPolicy", vec_env, learning_rate=lr, gamma=gamma,
-                            verbose=0, tensorboard_log="./logs/")
+                            verbose=0)
             elif algorithm == "TD3":
                 model = TD3("MlpPolicy", vec_env, learning_rate=lr, gamma=gamma,
-                            verbose=0, tensorboard_log="./logs/")
+                            verbose=0)
             else:
                 self.log(f"Algorithme {algorithm} non supporté.")
                 return
@@ -905,10 +905,10 @@ class IALabAdvanced:
         policy = "MlpPolicy"
         if algorithm == "DQN":
             model = DQN(policy, self.env, learning_rate=lr, gamma=gamma,
-                        verbose=0, tensorboard_log="./logs/")
+                        verbose=0)
         else:  # PPO
             model = PPO(policy, self.env, learning_rate=lr, gamma=gamma,
-                        verbose=0, tensorboard_log="./logs/")
+                        verbose=0)
         self.log(f"Modèle {algorithm} créé (LR={lr}, gamma={gamma}, policy={policy})")
         return model
 
@@ -1015,7 +1015,7 @@ class IALabAdvanced:
         self.update_ui()
 
     def archive_logs(self):
-        """Archive les logs de la simulation actuelle (texte compressé + fusion TensorBoard)."""
+        """Archive les logs de la simulation actuelle (texte compressé)."""
         try:
             self.log("Archivage des logs en cours...")
             # Chemin du répertoire logs
@@ -1033,12 +1033,6 @@ class IALabAdvanced:
             # Sélectionner le répertoire avec la date de modification la plus récente
             latest_sim = max(subdirs, key=lambda d: os.path.getmtime(os.path.join(log_dir, d)))
             sim_path = os.path.join(log_dir, latest_sim)
-            
-            # Fusionner les logs TensorBoard
-            self.log(f"Fusion des logs TensorBoard dans {sim_path}...")
-            merged = log_archiver.merge_tensorboard_logs(sim_path)
-            if merged:
-                self.log(f"Logs TensorBoard fusionnés : {merged}")
             
             # Compresser les logs texte uniquement dans le répertoire de simulation
             for root, dirs, files in os.walk(sim_path):
