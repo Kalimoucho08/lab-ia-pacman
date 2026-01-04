@@ -1,5 +1,5 @@
 # Dépendances principales pour le lab IA Pacman
-# Compatible avec Python 3.9-3.14 (testé sur 3.14)
+# Compatible avec Python 3.9-3.13 (testé sur 3.11)
 numpy>=1.24.0
 matplotlib>=3.7.0
 jupyter>=1.0.0

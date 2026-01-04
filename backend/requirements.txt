@@ -18,7 +18,7 @@ pettingzoo==1.24.3
 # Les environnements sont dans src/pacman_env/
 
 # Traitement d'images pour la visualisation
-pillow==10.1.0
+pillow>=10.1.0
 
 # Utilitaires
 numpy==1.26.2
@@ -41,4 +41,4 @@ psutil==5.9.7
 # Sérialisation
 pyyaml==6.0.1
 
-# Note: Python 3.14 est requis (spécifié dans pyproject.toml du projet principal)
+# Note: Python 3.11 est recommandé (compatibilité optimale avec ONNX Runtime et SQLAlchemy)

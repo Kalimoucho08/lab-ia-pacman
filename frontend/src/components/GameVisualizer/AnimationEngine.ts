@@ -281,7 +281,7 @@ export class AnimationEngine {
     // Rendu des particules
     this.particles.forEach(particle => {
       const alpha = particle.life / particle.maxLife;
-      const _size = particle.size * alpha;
+      // const _size = particle.size * alpha; // Variable non utilisée, commentée
       
       // Dans une implémentation réelle, on utiliserait le renderer
       // Pour l'instant, on se contente de log

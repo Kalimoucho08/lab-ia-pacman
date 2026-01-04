@@ -32,7 +32,7 @@ Un laboratoire d'intelligence artificielle centré sur Pacman, conçu pour l'exp
 ## Installation
 
 ### Prérequis
-- Python 3.9 ou supérieur (testé avec 3.14)
+- Python 3.9 ou supérieur (testé avec 3.11)
 - pip
 
 ### Étapes
