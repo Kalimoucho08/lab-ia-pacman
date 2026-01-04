@@ -51,7 +51,7 @@ export class CanvasRenderer {
   private animationFrameId: number | null = null;
   private isRendering: boolean = false;
   private cachedGrid: ImageBitmap | null = null;
-  private gridSize: { width: number; height: number } = { width: 0, height: 0 };
+  private _gridSize: { width: number; height: number } = { width: 0, height: 0 };
 
   // Couleurs standard pour les fantômes
   private static readonly GHOST_COLORS: Record<string, string> = {
@@ -455,3 +455,433 @@ export class CanvasRenderer {
 
   private createParticleSprite(): HTMLImageElement {
     const canvas = document.createElement('canvas');
+    canvas.width = this.config.cellSize;
+    canvas.height = this.config.cellSize;
+    const ctx = canvas.getContext('2d')!;
+    
+    // Particule circulaire avec gradient
+    const gradient = ctx.createRadialGradient(
+      this.config.cellSize / 2,
+      this.config.cellSize / 2,
+      0,
+      this.config.cellSize / 2,
+      this.config.cellSize / 2,
+      this.config.cellSize * 0.3
+    );
+    gradient.addColorStop(0, '#FFFFFF');
+    gradient.addColorStop(0.5, '#FFAA00');
+    gradient.addColorStop(1, 'rgba(255, 100, 0, 0)');
+    
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(
+      this.config.cellSize / 2,
+      this.config.cellSize / 2,
+      this.config.cellSize * 0.25,
+      0,
+      Math.PI * 2
+    );
+    ctx.fill();
+    
+    const img = new Image();
+    img.src = canvas.toDataURL();
+    return img;
+  }
+
+  /**
+   * Met à jour la configuration de rendu
+   */
+  public updateConfig(config: Partial<RenderConfig>): void {
+    this.config = { ...this.config, ...config };
+    this.setupCanvas();
+  }
+
+  /**
+   * Démarre le rendu continu
+   */
+  public startRendering(): void {
+    if (this.isRendering) return;
+    
+    this.isRendering = true;
+    this.lastFrameTime = performance.now();
+    
+    const renderLoop = (timestamp: number) => {
+      if (!this.isRendering) return;
+      
+      // Calculer le FPS
+      this.frameCount++;
+      const deltaTime = timestamp - this.lastFrameTime;
+      if (deltaTime >= 1000) {
+        this.fps = Math.round((this.frameCount * 1000) / deltaTime);
+        this.frameCount = 0;
+        this.lastFrameTime = timestamp;
+      }
+      
+      // Rendu sur le canvas hors écran
+      this.renderToOffscreen();
+      
+      // Copier le canvas hors écran vers le canvas principal
+      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+      this.ctx.drawImage(this.offscreenCanvas, 0, 0);
+      
+      this.animationFrameId = requestAnimationFrame(renderLoop);
+    };
+    
+    this.animationFrameId = requestAnimationFrame(renderLoop);
+  }
+
+  /**
+   * Arrête le rendu
+   */
+  public stopRendering(): void {
+    this.isRendering = false;
+    if (this.animationFrameId) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
+  }
+
+  /**
+   * Rend un état de jeu sur le canvas hors écran
+   */
+  private renderToOffscreen(): void {
+    const ctx = this.offscreenCtx;
+    const { cellSize: _cellSize, zoom: _zoom, showGrid } = this.config;
+    
+    // Effacer le canvas
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height);
+    
+    // Rendu de la grille (si activé)
+    if (showGrid && this.cachedGrid) {
+      ctx.drawImage(this.cachedGrid, 0, 0);
+    }
+    
+    // Note: Le rendu des éléments de jeu nécessite un GameState
+    // Cette méthode sera complétée dans GameStateManager
+  }
+
+  /**
+   * Prerend la grille pour optimisation
+   */
+  public cacheGrid(gridWidth: number, gridHeight: number): void {
+    this._gridSize = { width: gridWidth, height: gridHeight };
+    
+    const canvas = document.createElement('canvas');
+    const cellSize = this.config.cellSize * this.config.zoom;
+    canvas.width = gridWidth * cellSize;
+    canvas.height = gridHeight * cellSize;
+    const ctx = canvas.getContext('2d')!;
+    
+    // Dessiner la grille
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.lineWidth = 1;
+    
+    // Lignes verticales
+    for (let x = 0; x <= gridWidth; x++) {
+      ctx.beginPath();
+      ctx.moveTo(x * cellSize, 0);
+      ctx.lineTo(x * cellSize, canvas.height);
+      ctx.stroke();
+    }
+    
+    // Lignes horizontales
+    for (let y = 0; y <= gridHeight; y++) {
+      ctx.beginPath();
+      ctx.moveTo(0, y * cellSize);
+      ctx.lineTo(canvas.width, y * cellSize);
+      ctx.stroke();
+    }
+    
+    // Convertir en ImageBitmap pour performance
+    createImageBitmap(canvas).then(bitmap => {
+      this.cachedGrid = bitmap;
+    });
+  }
+
+  /**
+   * Rend Pac-Man
+   */
+  public renderPacman(x: number, y: number, direction: string, frame: number = 0): void {
+    if (!this.sprites) return;
+    
+    const ctx = this.offscreenCtx;
+    const { cellSize, zoom } = this.config;
+    const sprites = this.sprites.pacman[direction];
+    
+    if (sprites && sprites[frame % sprites.length]) {
+      const sprite = sprites[frame % sprites.length];
+      const drawX = x * cellSize * zoom;
+      const drawY = y * cellSize * zoom;
+      
+      ctx.drawImage(
+        sprite,
+        drawX,
+        drawY,
+        cellSize * zoom,
+        cellSize * zoom
+      );
+    }
+  }
+
+  /**
+   * Rend un fantôme
+   */
+  public renderGhost(x: number, y: number, color: string, mode: string, frame: number = 0): void {
+    if (!this.sprites) return;
+    
+    const ctx = this.offscreenCtx;
+    const { cellSize, zoom } = this.config;
+    
+    // Déterminer la couleur en fonction du mode
+    let spriteColor = color;
+    if (mode === 'frightened') {
+      spriteColor = (Math.floor(frame / 10) % 2 === 0) ? 'blue' : 'white';
+    }
+    
+    const sprites = this.sprites.ghosts[spriteColor];
+    if (sprites && sprites[frame % sprites.length]) {
+      const sprite = sprites[frame % sprites.length];
+      const drawX = x * cellSize * zoom;
+      const drawY = y * cellSize * zoom;
+      
+      ctx.drawImage(
+        sprite,
+        drawX,
+        drawY,
+        cellSize * zoom,
+        cellSize * zoom
+      );
+    }
+  }
+
+  /**
+   * Rend une pac-gomme
+   */
+  public renderPellet(x: number, y: number, frame: number = 0): void {
+    if (!this.sprites) return;
+    
+    const ctx = this.offscreenCtx;
+    const { cellSize, zoom } = this.config;
+    const sprite = this.sprites.pellets;
+    
+    // Animation de scintillement
+    const alpha = 0.7 + 0.3 * Math.sin(frame * 0.2);
+    ctx.globalAlpha = alpha;
+    
+    const drawX = x * cellSize * zoom + (cellSize * zoom * 0.5) - (cellSize * zoom * 0.15);
+    const drawY = y * cellSize * zoom + (cellSize * zoom * 0.5) - (cellSize * zoom * 0.15);
+    const size = cellSize * zoom * 0.3;
+    
+    ctx.drawImage(sprite, drawX, drawY, size, size);
+    ctx.globalAlpha = 1.0;
+  }
+
+  /**
+   * Rend une super pac-gomme
+   */
+  public renderPowerPellet(x: number, y: number, frame: number = 0): void {
+    if (!this.sprites) return;
+    
+    const ctx = this.offscreenCtx;
+    const { cellSize, zoom } = this.config;
+    const sprite = this.sprites.powerPellets;
+    
+    // Animation de pulsation
+    const scale = 0.8 + 0.2 * Math.sin(frame * 0.3);
+    const drawX = x * cellSize * zoom + (cellSize * zoom * 0.5) - (cellSize * zoom * 0.25 * scale);
+    const drawY = y * cellSize * zoom + (cellSize * zoom * 0.5) - (cellSize * zoom * 0.25 * scale);
+    const size = cellSize * zoom * 0.5 * scale;
+    
+    ctx.drawImage(sprite, drawX, drawY, size, size);
+  }
+
+  /**
+   * Rend un mur
+   */
+  public renderWall(x: number, y: number): void {
+    if (!this.sprites) return;
+    
+    const ctx = this.offscreenCtx;
+    const { cellSize, zoom } = this.config;
+    const sprite = this.sprites.walls;
+    
+    const drawX = x * cellSize * zoom;
+    const drawY = y * cellSize * zoom;
+    
+    ctx.drawImage(sprite, drawX, drawY, cellSize * zoom, cellSize * zoom);
+  }
+
+  /**
+   * Rend un effet de score
+   */
+  public renderScoreEffect(x: number, y: number, score: number, frame: number = 0): void {
+    if (!this.sprites) return;
+    
+    const ctx = this.offscreenCtx;
+    const { cellSize, zoom } = this.config;
+    const sprite = this.sprites.effects.score;
+    
+    // Animation de montée
+    const offsetY = -frame * 2;
+    const alpha = 1.0 - frame * 0.1;
+    
+    ctx.globalAlpha = Math.max(0, alpha);
+    const drawX = x * cellSize * zoom;
+    const drawY = y * cellSize * zoom + offsetY;
+    
+    ctx.drawImage(sprite, drawX, drawY, cellSize * zoom * 2, cellSize * zoom);
+    
+    // Afficher le score
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = `${12 * zoom}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.fillText(
+      `+${score}`,
+      drawX + cellSize * zoom,
+      drawY + cellSize * zoom * 0.7
+    );
+    
+    ctx.globalAlpha = 1.0;
+    ctx.textAlign = 'left';
+  }
+
+  /**
+   * Rend des particules
+   */
+  public renderParticles(x: number, y: number, count: number, frame: number = 0): void {
+    if (!this.sprites) return;
+    
+    const ctx = this.offscreenCtx;
+    const { cellSize, zoom } = this.config;
+    const sprite = this.sprites.effects.particles;
+    
+    for (let i = 0; i < count; i++) {
+      const angle = (i * Math.PI * 2) / count + frame * 0.1;
+      const distance = (frame % 10) * 2;
+      const particleX = x * cellSize * zoom + Math.cos(angle) * distance;
+      const particleY = y * cellSize * zoom + Math.sin(angle) * distance;
+      const size = cellSize * zoom * 0.2 * (1 - (frame % 20) / 20);
+      
+      ctx.globalAlpha = 0.7 * (1 - (frame % 20) / 20);
+      ctx.drawImage(sprite, particleX, particleY, size, size);
+    }
+    
+    ctx.globalAlpha = 1.0;
+  }
+
+  /**
+   * Rend les informations de jeu (score, vies, etc.)
+   */
+  public renderGameInfo(score: number, lives: number, step: number, fps?: number): void {
+    if (!this.config.showStats) return;
+    
+    const ctx = this.offscreenCtx;
+    const { zoom } = this.config;
+    
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = `${14 * zoom}px Arial`;
+    ctx.textAlign = 'left';
+    
+    // Score
+    ctx.fillText(`Score: ${score}`, 10 * zoom, 20 * zoom);
+    
+    // Vies
+    ctx.fillText(`Vies: ${lives}`, 10 * zoom, 40 * zoom);
+    
+    // Étape
+    ctx.fillText(`Étape: ${step}`, 10 * zoom, 60 * zoom);
+    
+    // FPS (si disponible)
+    if (fps !== undefined) {
+      ctx.fillText(`FPS: ${fps}`, 10 * zoom, 80 * zoom);
+    }
+  }
+
+  /**
+   * Rend un état de jeu complet (pour compatibilité avec GameVisualizer)
+   */
+  public render(gameState: GameState, config: any): void {
+    // Mettre à jour la configuration si nécessaire
+    if (config) {
+      this.updateConfig(config);
+    }
+    
+    // Rendu sur le canvas hors écran
+    this.renderToOffscreen();
+    
+    // Rendu des éléments de jeu
+    this.renderGameState(gameState);
+    
+    // Copier le canvas hors écran vers le canvas principal
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.ctx.drawImage(this.offscreenCanvas, 0, 0);
+  }
+
+  /**
+   * Rend un état de jeu spécifique
+   */
+  private renderGameState(gameState: GameState): void {
+    const { grid, pacman, ghosts, pellets, powerPellets, score, lives, step } = gameState;
+    const frame = Math.floor(step / 2); // Utiliser l'étape pour l'animation
+    
+    // Rendu de la grille
+    if (this.config.showGrid && grid) {
+      this.renderGrid(grid);
+    }
+    
+    // Rendu des pac-gommes
+    pellets.forEach(pellet => {
+      this.renderPellet(pellet.x, pellet.y, frame);
+    });
+    
+    // Rendu des super pac-gommes
+    powerPellets.forEach(powerPellet => {
+      this.renderPowerPellet(powerPellet.x, powerPellet.y, frame);
+    });
+    
+    // Rendu des fantômes
+    ghosts.forEach(ghost => {
+      this.renderGhost(ghost.x, ghost.y, ghost.color, ghost.mode, frame);
+    });
+    
+    // Rendu de Pac-Man
+    this.renderPacman(pacman.x, pacman.y, pacman.direction, frame);
+    
+    // Rendu des informations de jeu
+    this.renderGameInfo(score, lives, step, this.fps);
+  }
+
+  /**
+   * Rend la grille
+   */
+  private renderGrid(grid: number[][]): void {
+    // Si la grille est déjà en cache, on l'utilise
+    if (!this.cachedGrid) {
+      this.cacheGrid(grid[0].length, grid.length);
+    }
+    
+    // Dessiner la grille
+    if (this.cachedGrid) {
+      this.offscreenCtx.drawImage(this.cachedGrid, 0, 0);
+    }
+  }
+
+  /**
+   * Nettoie les ressources (alias de dispose pour compatibilité)
+   */
+  public cleanup(): void {
+    this.dispose();
+  }
+
+  /**
+   * Nettoie les ressources
+   */
+  public dispose(): void {
+    this.stopRendering();
+    if (this.cachedGrid) {
+      this.cachedGrid.close();
+      this.cachedGrid = null;
+    }
+  }
+}

@@ -1,265 +1,309 @@
-import React, { useRef, useEffect, useState } from 'react'
-import { Box, Paper, Typography, Slider, Stack, IconButton, Tooltip, Chip } from '@mui/material'
-import PlayArrowIcon from '@mui/icons-material/PlayArrow'
-import PauseIcon from '@mui/icons-material/Pause'
-import SkipNextIcon from '@mui/icons-material/SkipNext'
-import SkipPreviousIcon from '@mui/icons-material/SkipPrevious'
-import RestartAltIcon from '@mui/icons-material/RestartAlt'
-import ZoomInIcon from '@mui/icons-material/ZoomIn'
-import ZoomOutIcon from '@mui/icons-material/ZoomOut'
-import GridOnIcon from '@mui/icons-material/GridOn'
-import GridOffIcon from '@mui/icons-material/GridOff'
+/**
+ * Composant principal de visualisation Pac-Man
+ *
+ * Intègre tous les sous-systèmes :
+ * - CanvasRenderer : rendu optimisé Canvas HTML5
+ * - WebSocketClient : communication temps réel avec backend
+ * - GameStateManager : gestion et interpolation des états
+ * - AnimationEngine : animations fluides 60 FPS
+ * - ControlsPanel : contrôles interactifs
+ * - InfoOverlay : overlay d'informations
+ */
 
-const GRID_SIZE = 20
-const CELL_SIZE = 20
-const CANVAS_WIDTH = GRID_SIZE * CELL_SIZE
-const CANVAS_HEIGHT = GRID_SIZE * CELL_SIZE
+import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { Box, Paper, Typography, Alert, CircularProgress } from '@mui/material';
+
+// Import des sous-systèmes
+import { CanvasRenderer } from './CanvasRenderer';
+import { WebSocketClient } from './WebSocketClient';
+import { GameStateManager } from './GameStateManager';
+import { AnimationEngine } from './AnimationEngine';
+import ControlsPanel from './ControlsPanel';
+import InfoOverlay from './InfoOverlay';
+
+// Types
+import { GameState, RenderConfig } from '../../types/pacman';
+
+// Configuration par défaut
+const DEFAULT_CONFIG: RenderConfig = {
+  cellSize: 24,
+  zoom: 1.5,
+  showGrid: true,
+  showPaths: false,
+  showHeatmap: false,
+  showAgentLabels: true,
+  showStats: true,
+  animationSpeed: 1.0,
+  backgroundColor: '#000000',
+  gridColor: 'rgba(255, 255, 255, 0.1)',
+  pelletColor: '#FFFFFF',
+  powerPelletColor: '#FFFF00',
+  pacmanColor: '#FFFF00',
+  ghostColors: ['#FF0000', '#FF88FF', '#00FFFF', '#FFAA00'],
+};
 
 const GameVisualizer: React.FC = () => {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [speed, setSpeed] = useState(30)
-  const [zoom, setZoom] = useState(1.5)
-  const [showGrid, setShowGrid] = useState(true)
-  const [step, setStep] = useState(0)
-  const [gameState, setGameState] = useState({
-    pacman: { x: 5, y: 10, direction: 'right' },
-    ghosts: [
-      { x: 10, y: 5, color: '#ff0000', mode: 'chase' },
-      { x: 15, y: 5, color: '#ff88ff', mode: 'scatter' },
-      { x: 10, y: 15, color: '#00ffff', mode: 'chase' },
-      { x: 15, y: 15, color: '#ffaa00', mode: 'frightened' },
-    ],
-    pellets: Array.from({ length: 50 }, (_, i) => ({
-      x: Math.floor(Math.random() * GRID_SIZE),
-      y: Math.floor(Math.random() * GRID_SIZE),
-    })),
-    powerPellets: [
-      { x: 1, y: 1 },
-      { x: GRID_SIZE - 2, y: 1 },
-      { x: 1, y: GRID_SIZE - 2 },
-      { x: GRID_SIZE - 2, y: GRID_SIZE - 2 },
-    ],
-    score: 1245,
-    lives: 3,
-  })
-
-  // Dessiner le jeu sur le canvas
-  const drawGame = () => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
-    // Effacer le canvas
-    ctx.fillStyle = '#000'
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
-
-    // Dessiner la grille
-    if (showGrid) {
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'
-      ctx.lineWidth = 1
-      for (let x = 0; x <= GRID_SIZE; x++) {
-        ctx.beginPath()
-        ctx.moveTo(x * CELL_SIZE * zoom, 0)
-        ctx.lineTo(x * CELL_SIZE * zoom, canvas.height)
-        ctx.stroke()
-      }
-      for (let y = 0; y <= GRID_SIZE; y++) {
-        ctx.beginPath()
-        ctx.moveTo(0, y * CELL_SIZE * zoom)
-        ctx.lineTo(canvas.width, y * CELL_SIZE * zoom)
-        ctx.stroke()
-      }
-    }
-
-    // Dessiner les pac-gommes
-    ctx.fillStyle = '#ffffff'
-    gameState.pellets.forEach(pellet => {
-      ctx.beginPath()
-      ctx.arc(
-        (pellet.x + 0.5) * CELL_SIZE * zoom,
-        (pellet.y + 0.5) * CELL_SIZE * zoom,
-        2 * zoom,
-        0,
-        Math.PI * 2
-      )
-      ctx.fill()
-    })
-
-    // Dessiner les super pac-gommes
-    ctx.fillStyle = '#ffff00'
-    gameState.powerPellets.forEach(pellet => {
-      ctx.beginPath()
-      ctx.arc(
-        (pellet.x + 0.5) * CELL_SIZE * zoom,
-        (pellet.y + 0.5) * CELL_SIZE * zoom,
-        5 * zoom,
-        0,
-        Math.PI * 2
-      )
-      ctx.fill()
-    })
-
-    // Dessiner Pac-Man
-    ctx.fillStyle = '#ffff00'
-    ctx.beginPath()
-    const pacmanAngle = (step % 20) / 20 * Math.PI * 0.5
-    ctx.arc(
-      (gameState.pacman.x + 0.5) * CELL_SIZE * zoom,
-      (gameState.pacman.y + 0.5) * CELL_SIZE * zoom,
-      (CELL_SIZE * 0.4) * zoom,
-      pacmanAngle,
-      Math.PI * 2 - pacmanAngle
-    )
-    ctx.lineTo(
-      (gameState.pacman.x + 0.5) * CELL_SIZE * zoom,
-      (gameState.pacman.y + 0.5) * CELL_SIZE * zoom
-    )
-    ctx.fill()
-
-    // Dessiner les fantômes
-    gameState.ghosts.forEach(ghost => {
-      ctx.fillStyle = ghost.color
-      // Corps
-      ctx.beginPath()
-      ctx.arc(
-        (ghost.x + 0.5) * CELL_SIZE * zoom,
-        (ghost.y + 0.5) * CELL_SIZE * zoom,
-        (CELL_SIZE * 0.4) * zoom,
-        0,
-        Math.PI
-      )
-      ctx.lineTo(
-        (ghost.x - 0.3) * CELL_SIZE * zoom,
-        (ghost.y + 0.5) * CELL_SIZE * zoom
-      )
-      ctx.fill()
-
-      // Yeux
-      ctx.fillStyle = '#ffffff'
-      ctx.beginPath()
-      ctx.arc(
-        (ghost.x + 0.3) * CELL_SIZE * zoom,
-        (ghost.y + 0.3) * CELL_SIZE * zoom,
-        3 * zoom,
-        0,
-        Math.PI * 2
-      )
-      ctx.fill()
-      ctx.beginPath()
-      ctx.arc(
-        (ghost.x + 0.7) * CELL_SIZE * zoom,
-        (ghost.y + 0.3) * CELL_SIZE * zoom,
-        3 * zoom,
-        0,
-        Math.PI * 2
-      )
-      ctx.fill()
-
-      // Pupilles
-      ctx.fillStyle = '#0000ff'
-      ctx.beginPath()
-      ctx.arc(
-        (ghost.x + 0.3) * CELL_SIZE * zoom,
-        (ghost.y + 0.3) * CELL_SIZE * zoom,
-        1.5 * zoom,
-        0,
-        Math.PI * 2
-      )
-      ctx.fill()
-      ctx.beginPath()
-      ctx.arc(
-        (ghost.x + 0.7) * CELL_SIZE * zoom,
-        (ghost.y + 0.3) * CELL_SIZE * zoom,
-        1.5 * zoom,
-        0,
-        Math.PI * 2
-      )
-      ctx.fill()
-    })
-
-    // Dessiner les informations
-    ctx.fillStyle = '#ffffff'
-    ctx.font = `${12 * zoom}px Arial`
-    ctx.fillText(`Score: ${gameState.score}`, 10, 20)
-    ctx.fillText(`Vies: ${gameState.lives}`, 10, 40)
-    ctx.fillText(`Étape: ${step}`, 10, 60)
-  }
-
-  // Animation loop
+  // Références aux sous-systèmes
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const rendererRef = useRef<CanvasRenderer | null>(null);
+  const wsClientRef = useRef<WebSocketClient | null>(null);
+  const stateManagerRef = useRef<GameStateManager | null>(null);
+  const animationEngineRef = useRef<AnimationEngine | null>(null);
+  
+  // États
+  const [isConnected, setIsConnected] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [gameState, setGameState] = useState<GameState | null>(null);
+  const [renderConfig, setRenderConfig] = useState<RenderConfig>(DEFAULT_CONFIG);
+  const [performanceStats, setPerformanceStats] = useState({
+    fps: 0,
+    latency: 0,
+    memoryUsage: 0,
+    bufferSize: 0,
+    lastUpdate: Date.now(),
+  });
+  
+  // Initialisation des sous-systèmes
   useEffect(() => {
-    let animationFrameId: number
-    let lastTime = 0
-    const interval = 1000 / speed
-
-    const animate = (time: number) => {
-      if (isPlaying && time - lastTime > interval) {
-        lastTime = time
-        setStep(prev => prev + 1)
+    if (!canvasRef.current) return;
+    
+    // Initialiser le moteur de rendu
+    const canvas = canvasRef.current;
+    const renderer = new CanvasRenderer(canvas, renderConfig);
+    rendererRef.current = renderer;
+    
+    // Initialiser le gestionnaire d'état
+    const stateManager = new GameStateManager();
+    stateManagerRef.current = stateManager;
+    
+    // Initialiser le moteur d'animations
+    const animationEngine = new AnimationEngine();
+    animationEngine.setRenderer(renderer);
+    animationEngineRef.current = animationEngine;
+    
+    // Initialiser le client WebSocket
+    const wsClient = new WebSocketClient({
+      url: 'ws://localhost:8000/ws/game_state',
+    });
+    wsClientRef.current = wsClient;
+    
+    // Enregistrer les callbacks
+    wsClient.onGameState((gameState: GameState) => {
+      stateManager.addState(gameState);
+    });
+    
+    wsClient.onConnect(() => {
+      setIsConnected(true);
+      console.log('WebSocket connecté');
+    });
+    
+    wsClient.onDisconnect(() => {
+      setIsConnected(false);
+      console.log('WebSocket déconnecté');
+    });
+    
+    wsClient.onError((error: string) => {
+      console.error('Erreur WebSocket:', error);
+    });
+    
+    // Gérer les autres types de messages
+    // Note: WebSocketClient n'a pas de callback générique onMessage,
+    // donc pour performance_stats, il faudrait soit l'ajouter soit utiliser un autre mécanisme
+    // Pour l'instant, on ignore performance_stats
+    
+    // Démarrer la boucle de rendu
+    let animationFrameId: number;
+    let lastTime = 0;
+    
+    const renderLoop = (timestamp: number) => {
+      const deltaTime = timestamp - lastTime;
+      lastTime = timestamp;
+      
+      // Calculer le FPS
+      const fps = deltaTime > 0 ? 1000 / deltaTime : 0;
+      
+      // Mettre à jour les statistiques de performance
+      setPerformanceStats(prev => ({
+        ...prev,
+        fps: Math.round(fps),
+        lastUpdate: timestamp,
+      }));
+      
+      // Obtenir l'état actuel interpolé
+      const currentState = stateManager.getCurrentState();
+      if (currentState) {
+        setGameState(currentState);
         
-        // Mettre à jour la position de Pac-Man
-        setGameState(prev => {
-          const newX = (prev.pacman.x + 1) % GRID_SIZE
-          return {
-            ...prev,
-            pacman: { ...prev.pacman, x: newX },
+        // Mettre à jour le moteur d'animations
+        if (animationEngineRef.current) {
+          animationEngineRef.current.update(deltaTime);
+        }
+        
+        // Rendu
+        if (rendererRef.current) {
+          rendererRef.current.render(currentState, renderConfig);
+          
+          // Appliquer les effets d'écran
+          if (animationEngineRef.current) {
+            animationEngineRef.current.applyScreenEffects();
           }
-        })
+        }
       }
-      drawGame()
-      animationFrameId = requestAnimationFrame(animate)
-    }
-
-    animationFrameId = requestAnimationFrame(animate)
+      
+      animationFrameId = requestAnimationFrame(renderLoop);
+    };
+    
+    animationFrameId = requestAnimationFrame(renderLoop);
+    
+    // Nettoyage
     return () => {
-      cancelAnimationFrame(animationFrameId)
-    }
-  }, [isPlaying, speed, zoom, showGrid, step])
-
-  // Initial draw
+      cancelAnimationFrame(animationFrameId);
+      wsClient.disconnect();
+      renderer.cleanup();
+    };
+  }, []);
+  
+  // Gestion de la lecture/pause
   useEffect(() => {
-    drawGame()
-  }, [])
-
-  const handlePlayPause = () => {
-    setIsPlaying(!isPlaying)
-  }
-
-  const handleStepForward = () => {
-    setStep(prev => prev + 1)
-    drawGame()
-  }
-
-  const handleStepBackward = () => {
-    setStep(prev => Math.max(0, prev - 1))
-    drawGame()
-  }
-
-  const handleReset = () => {
-    setIsPlaying(false)
-    setStep(0)
-    setGameState({
-      ...gameState,
-      pacman: { x: 5, y: 10, direction: 'right' },
-    })
-  }
-
-  const handleZoomIn = () => {
-    setZoom(prev => Math.min(3, prev + 0.25))
-  }
-
-  const handleZoomOut = () => {
-    setZoom(prev => Math.max(0.5, prev - 0.25))
-  }
-
-  const handleSpeedChange = (_event: Event, newValue: number | number[]) => {
-    setSpeed(newValue as number)
-  }
-
+    if (stateManagerRef.current) {
+      stateManagerRef.current.setPaused(!isPlaying);
+    }
+  }, [isPlaying]);
+  
+  // Mise à jour de la configuration de rendu
+  useEffect(() => {
+    if (rendererRef.current) {
+      rendererRef.current.updateConfig(renderConfig);
+    }
+  }, [renderConfig]);
+  
+  // Gestionnaires d'événements
+  const handlePlayPause = useCallback(() => {
+    setIsPlaying(prev => !prev);
+  }, []);
+  
+  const handleStepForward = useCallback(() => {
+    if (stateManagerRef.current) {
+      stateManagerRef.current.stepForward();
+    }
+  }, []);
+  
+  const handleStepBackward = useCallback(() => {
+    if (stateManagerRef.current) {
+      stateManagerRef.current.stepBackward();
+    }
+  }, []);
+  
+  const handleReset = useCallback(() => {
+    setIsPlaying(false);
+    if (stateManagerRef.current) {
+      stateManagerRef.current.reset();
+    }
+    if (animationEngineRef.current) {
+      animationEngineRef.current.reset();
+    }
+  }, []);
+  
+  const handleZoomIn = useCallback(() => {
+    setRenderConfig(prev => ({
+      ...prev,
+      zoom: Math.min(3.0, prev.zoom + 0.25),
+    }));
+  }, []);
+  
+  const handleZoomOut = useCallback(() => {
+    setRenderConfig(prev => ({
+      ...prev,
+      zoom: Math.max(0.5, prev.zoom - 0.25),
+    }));
+  }, []);
+  
+  const handleSpeedChange = useCallback((speed: number) => {
+    setRenderConfig(prev => ({
+      ...prev,
+      animationSpeed: speed,
+    }));
+    if (stateManagerRef.current) {
+      stateManagerRef.current.setSpeed(speed);
+    }
+  }, []);
+  
+  const handleToggleGrid = useCallback(() => {
+    setRenderConfig(prev => ({
+      ...prev,
+      showGrid: !prev.showGrid,
+    }));
+  }, []);
+  
+  const handleTogglePaths = useCallback(() => {
+    setRenderConfig(prev => ({
+      ...prev,
+      showPaths: !prev.showPaths,
+    }));
+  }, []);
+  
+  const handleToggleHeatmap = useCallback(() => {
+    setRenderConfig(prev => ({
+      ...prev,
+      showHeatmap: !prev.showHeatmap,
+    }));
+  }, []);
+  
+  const handleToggleAgentLabels = useCallback(() => {
+    setRenderConfig(prev => ({
+      ...prev,
+      showAgentLabels: !prev.showAgentLabels,
+    }));
+  }, []);
+  
+  const handleToggleStats = useCallback(() => {
+    setRenderConfig(prev => ({
+      ...prev,
+      showStats: !prev.showStats,
+    }));
+  }, []);
+  
+  const handleExportImage = useCallback(() => {
+    if (rendererRef.current && canvasRef.current) {
+      const dataUrl = canvasRef.current.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = `pacman_${Date.now()}.png`;
+      link.href = dataUrl;
+      link.click();
+    }
+  }, []);
+  
+  const handleExportVideo = useCallback(() => {
+    // Implémentation simplifiée - utiliser MediaRecorder API
+    alert('Export vidéo - fonctionnalité avancée à implémenter');
+  }, []);
+  
+  // Calculer la taille du canvas
+  const canvasWidth = 800;
+  const canvasHeight = 600;
+  
   return (
-    <Box>
+    <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
+      {/* Indicateur de connexion */}
+      {!isConnected && (
+        <Alert 
+          severity="warning" 
+          sx={{ 
+            position: 'absolute', 
+            top: 16, 
+            left: '50%', 
+            transform: 'translateX(-50%)',
+            zIndex: 1100,
+            width: 'auto',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <CircularProgress size={16} sx={{ mr: 1 }} />
+            Connexion au serveur en cours...
+          </Box>
+        </Alert>
+      )}
+      
       {/* Canvas de jeu */}
       <Paper 
         sx={{ 
@@ -267,122 +311,86 @@ const GameVisualizer: React.FC = () => {
           mb: 2, 
           display: 'flex', 
           justifyContent: 'center',
+          alignItems: 'center',
           bgcolor: 'black',
+          position: 'relative',
+          overflow: 'hidden',
+          minHeight: canvasHeight + 40,
         }}
       >
         <canvas
           ref={canvasRef}
-          width={CANVAS_WIDTH * zoom}
-          height={CANVAS_HEIGHT * zoom}
+          width={canvasWidth}
+          height={canvasHeight}
           className="game-canvas"
           style={{
             borderRadius: '8px',
             boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
+            backgroundColor: '#000',
           }}
         />
-      </Paper>
-
-      {/* Contrôles */}
-      <Paper sx={{ p: 2, mb: 2 }}>
-        <Stack direction="row" spacing={1} justifyContent="center" sx={{ mb: 2 }}>
-          <Tooltip title="Étape précédente">
-            <IconButton onClick={handleStepBackward}>
-              <SkipPreviousIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title={isPlaying ? "Pause" : "Lecture"}>
-            <IconButton 
-              color={isPlaying ? "warning" : "success"} 
-              onClick={handlePlayPause}
-              sx={{ width: 56, height: 56 }}
-            >
-              {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Étape suivante">
-            <IconButton onClick={handleStepForward}>
-              <SkipNextIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Réinitialiser">
-            <IconButton onClick={handleReset}>
-              <RestartAltIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Zoom avant">
-            <IconButton onClick={handleZoomIn}>
-              <ZoomInIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Zoom arrière">
-            <IconButton onClick={handleZoomOut}>
-              <ZoomOutIcon />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title={showGrid ? "Masquer la grille" : "Afficher la grille"}>
-            <IconButton onClick={() => setShowGrid(!showGrid)}>
-              {showGrid ? <GridOnIcon /> : <GridOffIcon />}
-            </IconButton>
-          </Tooltip>
-        </Stack>
-
-        <Box sx={{ px: 2 }}>
-          <Typography variant="body2" gutterBottom>
-            Vitesse: {speed} FPS
-          </Typography>
-          <Slider
-            value={speed}
-            onChange={handleSpeedChange}
-            min={1}
-            max={60}
-            step={1}
-            valueLabelDisplay="auto"
-            sx={{ mt: 1 }}
-          />
-        </Box>
-      </Paper>
-
-      {/* Informations du jeu */}
-      <Paper sx={{ p: 2 }}>
-        <Typography variant="h6" gutterBottom>
-          État du jeu
-        </Typography>
-        <Stack direction="row" spacing={2} flexWrap="wrap">
-          <Chip 
-            label={`Score: ${gameState.score}`} 
-            color="primary" 
-            variant="outlined" 
-          />
-          <Chip 
-            label={`Vies: ${gameState.lives}`} 
-            color={gameState.lives > 1 ? "success" : "error"} 
-            variant="outlined" 
-          />
-          <Chip 
-            label={`Étape: ${step}`} 
-            color="info" 
-            variant="outlined" 
-          />
-          <Chip 
-            label={`Zoom: ${zoom.toFixed(1)}x`} 
-            color="secondary" 
-            variant="outlined" 
-          />
-          <Chip 
-            label={isPlaying ? "En cours" : "En pause"} 
-            color={isPlaying ? "success" : "warning"} 
-            variant="outlined" 
-          />
-        </Stack>
         
-        <Typography variant="body2" sx={{ mt: 2, color: 'text.secondary' }}>
-          Position Pac-Man: ({gameState.pacman.x}, {gameState.pacman.y}) • 
-          Fantômes actifs: {gameState.ghosts.length} • 
-          Pac-gommes restantes: {gameState.pellets.length}
-        </Typography>
+        {/* Overlay d'informations */}
+        {gameState && (
+          <InfoOverlay
+            gameState={gameState}
+            showStats={renderConfig.showStats}
+            showPaths={renderConfig.showPaths}
+            showHeatmap={renderConfig.showHeatmap}
+            showAgentLabels={renderConfig.showAgentLabels}
+            fps={performanceStats.fps}
+            latency={performanceStats.latency}
+            memoryUsage={performanceStats.memoryUsage}
+            bufferSize={performanceStats.bufferSize}
+            onToggleStats={handleToggleStats}
+            onTogglePaths={handleTogglePaths}
+            onToggleHeatmap={handleToggleHeatmap}
+            onToggleAgentLabels={handleToggleAgentLabels}
+          />
+        )}
       </Paper>
+      
+      {/* Panneau de contrôles */}
+      <ControlsPanel
+        isPlaying={isPlaying}
+        isConnected={isConnected}
+        zoom={renderConfig.zoom}
+        speed={renderConfig.animationSpeed}
+        showGrid={renderConfig.showGrid}
+        showPaths={renderConfig.showPaths}
+        showHeatmap={renderConfig.showHeatmap}
+        showAgentLabels={renderConfig.showAgentLabels}
+        showStats={renderConfig.showStats}
+        onPlayPause={handlePlayPause}
+        onStepForward={handleStepForward}
+        onStepBackward={handleStepBackward}
+        onReset={handleReset}
+        onZoomIn={handleZoomIn}
+        onZoomOut={handleZoomOut}
+        onSpeedChange={handleSpeedChange}
+        onToggleGrid={handleToggleGrid}
+        onTogglePaths={handleTogglePaths}
+        onToggleHeatmap={handleToggleHeatmap}
+        onToggleAgentLabels={handleToggleAgentLabels}
+        onToggleStats={handleToggleStats}
+        onExportImage={handleExportImage}
+        onExportVideo={handleExportVideo}
+        performanceStats={performanceStats}
+      />
+      
+      {/* Informations de débogage (optionnel) */}
+      {import.meta.env.DEV && (
+        <Paper sx={{ p: 2, mt: 2, bgcolor: 'grey.900' }}>
+          <Typography variant="caption" color="text.secondary">
+            Débogage: {gameState ? `Étape ${gameState.step}` : 'Aucun état'} •
+            FPS: {performanceStats.fps} •
+            Buffer: {performanceStats.bufferSize} •
+            Latence: {performanceStats.latency}ms
+          </Typography>
+        </Paper>
+      )}
     </Box>
-  )
-}
+  );
+};
 
-export default GameVisualizer
+export default GameVisualizer;

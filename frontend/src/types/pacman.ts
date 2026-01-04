@@ -87,7 +87,24 @@ export interface GameState {
 }
 
 export interface WebSocketMessage {
-  type: 'game_state' | 'metrics' | 'session_update' | 'error' | 'subscribe' | 'unsubscribe'
+  type: 'game_state' | 'metrics' | 'session_update' | 'error' | 'subscribe' | 'unsubscribe' | 'performance_stats'
   data: any
   timestamp: string
+}
+
+export interface RenderConfig {
+  cellSize: number
+  zoom: number
+  showGrid: boolean
+  showPaths: boolean
+  showHeatmap: boolean
+  showAgentLabels: boolean
+  showStats: boolean
+  animationSpeed: number
+  backgroundColor: string
+  gridColor: string
+  pelletColor: string
+  powerPelletColor: string
+  pacmanColor: string
+  ghostColors: string[]
 }
