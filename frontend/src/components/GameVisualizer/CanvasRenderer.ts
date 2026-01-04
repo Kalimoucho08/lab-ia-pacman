@@ -246,3 +246,212 @@ export class CanvasRenderer {
     const waveAmplitude = frame === 0 ? 2 : 4;
     for (let i = 0; i < 3; i++) {
       const x = this.config.cellSize / 2 - bodyWidth / 2 + (bodyWidth / 3) * i;
+      const y = this.config.cellSize / 2 + bodyHeight * 0.3;
+      ctx.quadraticCurveTo(
+        x + bodyWidth / 6,
+        y + waveAmplitude,
+        x + bodyWidth / 3,
+        y
+      );
+    }
+    ctx.closePath();
+    ctx.fill();
+    
+    // Yeux
+    ctx.fillStyle = '#FFFFFF';
+    const eyeRadius = this.config.cellSize * 0.12;
+    const leftEyeX = this.config.cellSize / 2 - eyeRadius;
+    const rightEyeX = this.config.cellSize / 2 + eyeRadius;
+    const eyeY = this.config.cellSize / 2 - bodyHeight * 0.1;
+    
+    ctx.beginPath();
+    ctx.arc(leftEyeX, eyeY, eyeRadius, 0, Math.PI * 2);
+    ctx.fill();
+    
+    ctx.beginPath();
+    ctx.arc(rightEyeX, eyeY, eyeRadius, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Pupilles
+    ctx.fillStyle = '#0000FF';
+    const pupilOffset = frame === 0 ? 0 : eyeRadius * 0.3;
+    ctx.beginPath();
+    ctx.arc(leftEyeX + pupilOffset, eyeY, eyeRadius * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+    
+    ctx.beginPath();
+    ctx.arc(rightEyeX + pupilOffset, eyeY, eyeRadius * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+    
+    const img = new Image();
+    img.src = canvas.toDataURL();
+    return img;
+  }
+
+  private createPelletSprite(): HTMLImageElement {
+    const canvas = document.createElement('canvas');
+    canvas.width = this.config.cellSize;
+    canvas.height = this.config.cellSize;
+    const ctx = canvas.getContext('2d')!;
+    
+    // Pac-gomme scintillante
+    const gradient = ctx.createRadialGradient(
+      this.config.cellSize / 2,
+      this.config.cellSize / 2,
+      0,
+      this.config.cellSize / 2,
+      this.config.cellSize / 2,
+      this.config.cellSize * 0.2
+    );
+    gradient.addColorStop(0, '#FFFFFF');
+    gradient.addColorStop(1, '#CCCCCC');
+    
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(
+      this.config.cellSize / 2,
+      this.config.cellSize / 2,
+      this.config.cellSize * 0.15,
+      0,
+      Math.PI * 2
+    );
+    ctx.fill();
+    
+    const img = new Image();
+    img.src = canvas.toDataURL();
+    return img;
+  }
+
+  private createPowerPelletSprite(): HTMLImageElement {
+    const canvas = document.createElement('canvas');
+    canvas.width = this.config.cellSize;
+    canvas.height = this.config.cellSize;
+    const ctx = canvas.getContext('2d')!;
+    
+    // Power pellet pulsante
+    const gradient = ctx.createRadialGradient(
+      this.config.cellSize / 2,
+      this.config.cellSize / 2,
+      0,
+      this.config.cellSize / 2,
+      this.config.cellSize / 2,
+      this.config.cellSize * 0.3
+    );
+    gradient.addColorStop(0, '#FFFF00');
+    gradient.addColorStop(0.7, '#FFAA00');
+    gradient.addColorStop(1, '#FF5500');
+    
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(
+      this.config.cellSize / 2,
+      this.config.cellSize / 2,
+      this.config.cellSize * 0.25,
+      0,
+      Math.PI * 2
+    );
+    ctx.fill();
+    
+    // Effet de brillance
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+    ctx.beginPath();
+    ctx.arc(
+      this.config.cellSize / 2 - this.config.cellSize * 0.1,
+      this.config.cellSize / 2 - this.config.cellSize * 0.1,
+      this.config.cellSize * 0.1,
+      0,
+      Math.PI * 2
+    );
+    ctx.fill();
+    
+    const img = new Image();
+    img.src = canvas.toDataURL();
+    return img;
+  }
+
+  private createWallSprite(): HTMLImageElement {
+    const canvas = document.createElement('canvas');
+    canvas.width = this.config.cellSize;
+    canvas.height = this.config.cellSize;
+    const ctx = canvas.getContext('2d')!;
+    
+    // Mur avec texture
+    ctx.fillStyle = '#1E3A8A';
+    ctx.fillRect(0, 0, this.config.cellSize, this.config.cellSize);
+    
+    // Bordure intérieure
+    ctx.strokeStyle = '#3B82F6';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(2, 2, this.config.cellSize - 4, this.config.cellSize - 4);
+    
+    // Texture de points
+    ctx.fillStyle = '#60A5FA';
+    for (let i = 0; i < 4; i++) {
+      for (let j = 0; j < 4; j++) {
+        if ((i + j) % 2 === 0) {
+          ctx.beginPath();
+          ctx.arc(
+            4 + i * (this.config.cellSize - 8) / 3,
+            4 + j * (this.config.cellSize - 8) / 3,
+            1,
+            0,
+            Math.PI * 2
+          );
+          ctx.fill();
+        }
+      }
+    }
+    
+    const img = new Image();
+    img.src = canvas.toDataURL();
+    return img;
+  }
+
+  private createScoreEffectSprite(): HTMLImageElement {
+    const canvas = document.createElement('canvas');
+    canvas.width = this.config.cellSize * 2;
+    canvas.height = this.config.cellSize;
+    const ctx = canvas.getContext('2d')!;
+    
+    // Effet de score (étoile)
+    const gradient = ctx.createRadialGradient(
+      this.config.cellSize,
+      this.config.cellSize / 2,
+      0,
+      this.config.cellSize,
+      this.config.cellSize / 2,
+      this.config.cellSize * 0.8
+    );
+    gradient.addColorStop(0, '#FFFFFF');
+    gradient.addColorStop(1, '#FFFF00');
+    
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    for (let i = 0; i < 5; i++) {
+      const angle = (i * Math.PI * 2) / 5;
+      const outerRadius = this.config.cellSize * 0.4;
+      const innerRadius = this.config.cellSize * 0.2;
+      
+      const x1 = this.config.cellSize + Math.cos(angle) * outerRadius;
+      const y1 = this.config.cellSize / 2 + Math.sin(angle) * outerRadius;
+      
+      const x2 = this.config.cellSize + Math.cos(angle + Math.PI / 5) * innerRadius;
+      const y2 = this.config.cellSize / 2 + Math.sin(angle + Math.PI / 5) * innerRadius;
+      
+      if (i === 0) {
+        ctx.moveTo(x1, y1);
+      } else {
+        ctx.lineTo(x1, y1);
+      }
+      ctx.lineTo(x2, y2);
+    }
+    ctx.closePath();
+    ctx.fill();
+    
+    const img = new Image();
+    img.src = canvas.toDataURL();
+    return img;
+  }
+
+  private createParticleSprite(): HTMLImageElement {
+    const canvas = document.createElement('canvas');
