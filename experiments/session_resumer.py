@@ -440,4 +440,295 @@ if __name__ == "__main__":
             archive_path_b: Chemin vers la deuxième archive
             
         Returns:
-            Ob
+            Objet SessionComparison avec les différences et recommandations
+        """
+        # Charger les deux archives
+        archive_a = self.load_archive(archive_path_a)
+        archive_b = self.load_archive(archive_path_b)
+        
+        if not archive_a or not archive_b:
+            logger.error("Impossible de charger une ou les deux archives")
+            return None
+        
+        try:
+            metadata_a = archive_a['metadata']
+            metadata_b = archive_b['metadata']
+            
+            # Extraire les paramètres
+            params_a = metadata_a.get('config', {})
+            params_b = metadata_b.get('config', {})
+            
+            # Extraire les métriques
+            metrics_a = metadata_a.get('metrics', {})
+            metrics_b = metadata_b.get('metrics', {})
+            
+            # Calculer les différences de paramètres
+            parameter_diffs = self._compute_parameter_diffs(params_a, params_b)
+            
+            # Calculer les différences de métriques
+            metric_diffs = self._compute_metric_diffs(metrics_a, metrics_b)
+            
+            # Calculer le score de compatibilité
+            compatibility_score = self._compute_compatibility_score(parameter_diffs, metric_diffs)
+            
+            # Générer des recommandations
+            recommendations = self._generate_recommendations(parameter_diffs, metric_diffs, compatibility_score)
+            
+            # Créer l'objet de comparaison
+            comparison = SessionComparison(
+                session_a_id=metadata_a.get('session_id', 'unknown'),
+                session_b_id=metadata_b.get('session_id', 'unknown'),
+                parameter_diffs=parameter_diffs,
+                metric_diffs=metric_diffs,
+                compatibility_score=compatibility_score,
+                recommendations=recommendations
+            )
+            
+            # Sauvegarder la comparaison
+            self._save_comparison(comparison, archive_path_a, archive_path_b)
+            
+            logger.info(f"Sessions comparées: {comparison.session_a_id} vs {comparison.session_b_id}")
+            logger.info(f"Score de compatibilité: {compatibility_score:.2f}")
+            
+            return comparison
+            
+        except Exception as e:
+            logger.error(f"Erreur lors de la comparaison des sessions: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return None
+    
+    def _compute_parameter_diffs(self, params_a: Dict[str, Any], params_b: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+        """Calcule les différences entre deux ensembles de paramètres."""
+        diffs = {}
+        all_keys = set(params_a.keys()) | set(params_b.keys())
+        
+        for key in all_keys:
+            value_a = params_a.get(key)
+            value_b = params_b.get(key)
+            
+            if value_a != value_b:
+                diffs[key] = {
+                    'value_a': value_a,
+                    'value_b': value_b,
+                    'type': type(value_a).__name__ if value_a is not None else type(value_b).__name__,
+                    'difference': self._compute_difference(value_a, value_b)
+                }
+        
+        return diffs
+    
+    def _compute_metric_diffs(self, metrics_a: Dict[str, Any], metrics_b: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+        """Calcule les différences entre deux ensembles de métriques."""
+        diffs = {}
+        all_keys = set(metrics_a.keys()) | set(metrics_b.keys())
+        
+        for key in all_keys:
+            value_a = metrics_a.get(key)
+            value_b = metrics_b.get(key)
+            
+            if isinstance(value_a, (int, float)) and isinstance(value_b, (int, float)):
+                diff_percent = ((value_b - value_a) / value_a * 100) if value_a != 0 else float('inf')
+                diffs[key] = {
+                    'value_a': value_a,
+                    'value_b': value_b,
+                    'difference': value_b - value_a,
+                    'difference_percent': diff_percent,
+                    'improvement': value_b > value_a if key not in ['loss', 'error'] else value_b < value_a
+                }
+            elif value_a != value_b:
+                diffs[key] = {
+                    'value_a': value_a,
+                    'value_b': value_b,
+                    'difference': 'different'
+                }
+        
+        return diffs
+    
+    def _compute_difference(self, value_a: Any, value_b: Any) -> Any:
+        """Calcule la différence entre deux valeurs."""
+        if isinstance(value_a, (int, float)) and isinstance(value_b, (int, float)):
+            return value_b - value_a
+        elif isinstance(value_a, str) and isinstance(value_b, str):
+            return f"'{value_a}' vs '{value_b}'"
+        else:
+            return f"{value_a} vs {value_b}"
+    
+    def _compute_compatibility_score(self, parameter_diffs: Dict[str, Dict[str, Any]],
+                                   metric_diffs: Dict[str, Dict[str, Any]]) -> float:
+        """Calcule un score de compatibilité entre 0 et 1."""
+        if not parameter_diffs and not metric_diffs:
+            return 1.0  # Identiques
+        
+        # Pénalités pour les différences
+        param_penalty = len(parameter_diffs) * 0.1
+        metric_penalty = 0
+        
+        for diff in metric_diffs.values():
+            if 'difference_percent' in diff:
+                # Pénalité plus forte pour les grandes différences de métriques
+                metric_penalty += min(abs(diff['difference_percent']) / 100, 0.5)
+        
+        total_penalty = min(param_penalty + metric_penalty, 1.0)
+        return 1.0 - total_penalty
+    
+    def _generate_recommendations(self, parameter_diffs: Dict[str, Dict[str, Any]],
+                                metric_diffs: Dict[str, Dict[str, Any]],
+                                compatibility_score: float) -> List[str]:
+        """Génère des recommandations basées sur les différences."""
+        recommendations = []
+        
+        if compatibility_score > 0.8:
+            recommendations.append("Sessions très compatibles - fusion recommandée")
+        elif compatibility_score > 0.5:
+            recommendations.append("Sessions modérément compatibles - ajustements mineurs nécessaires")
+        else:
+            recommendations.append("Sessions peu compatibles - fusion déconseillée")
+        
+        # Recommandations basées sur les paramètres
+        for param, diff in parameter_diffs.items():
+            if param in ['learning_rate', 'gamma', 'epsilon']:
+                recommendations.append(f"Ajuster {param}: {diff['value_a']} → {diff['value_b']}")
+        
+        # Recommandations basées sur les métriques
+        for metric, diff in metric_diffs.items():
+            if 'improvement' in diff:
+                if diff['improvement']:
+                    recommendations.append(f"{metric} amélioré de {diff['difference_percent']:.1f}%")
+                else:
+                    recommendations.append(f"{metric} dégradé de {abs(diff['difference_percent']):.1f}%")
+        
+        return recommendations
+    
+    def _save_comparison(self, comparison: SessionComparison, path_a: str, path_b: str) -> None:
+        """Sauvegarde la comparaison dans un fichier JSON."""
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"comparison_{comparison.session_a_id}_vs_{comparison.session_b_id}_{timestamp}.json"
+        filepath = os.path.join("experiments/comparisons", filename)
+        
+        comparison_dict = asdict(comparison)
+        comparison_dict['archive_path_a'] = path_a
+        comparison_dict['archive_path_b'] = path_b
+        comparison_dict['comparison_timestamp'] = timestamp
+        
+        os.makedirs("experiments/comparisons", exist_ok=True)
+        
+        with open(filepath, 'w') as f:
+            json.dump(comparison_dict, f, indent=2)
+        
+        logger.info(f"Comparaison sauvegardée: {filepath}")
+    
+    def merge_sessions(self, archive_paths: List[str], merge_config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Fusionne plusieurs sessions pour une méta-analyse.
+        
+        Args:
+            archive_paths: Liste des chemins vers les archives à fusionner
+            merge_config: Configuration pour la fusion
+            
+        Returns:
+            Informations sur la fusion ou None en cas d'erreur
+        """
+        if len(archive_paths) < 2:
+            logger.error("Au moins deux archives sont nécessaires pour une fusion")
+            return None
+        
+        try:
+            # Charger toutes les archives
+            archives = []
+            for path in archive_paths:
+                archive_data = self.load_archive(path)
+                if archive_data:
+                    archives.append(archive_data)
+                else:
+                    logger.warning(f"Archive ignorée (échec du chargement): {path}")
+            
+            if len(archives) < 2:
+                logger.error("Pas assez d'archives valides pour la fusion")
+                return None
+            
+            # Créer un répertoire pour la fusion
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            merge_id = f"merged_{len(archives)}sessions_{timestamp}"
+            merge_dir = os.path.join("experiments/merged", merge_id)
+            os.makedirs(merge_dir, exist_ok=True)
+            
+            # Copier les fichiers de chaque archive
+            merged_files = []
+            for i, archive_data in enumerate(archives):
+                session_id = archive_data['metadata'].get('session_id', f'session_{i}')
+                session_dir = os.path.join(merge_dir, f"session_{i}_{session_id}")
+                os.makedirs(session_dir, exist_ok=True)
+                
+                # Copier les fichiers importants
+                for file_type, files in archive_data['files'].items():
+                    for file in files:
+                        src_path = os.path.join(archive_data['extracted_dir'], file)
+                        dst_path = os.path.join(session_dir, file)
+                        os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+                        shutil.copy2(src_path, dst_path)
+                        merged_files.append(dst_path)
+            
+            # Créer un fichier de métadonnées de fusion
+            merge_metadata = {
+                'merge_id': merge_id,
+                'timestamp': timestamp,
+                'source_archives': archive_paths,
+                'merged_sessions': [a['metadata'].get('session_id', 'unknown') for a in archives],
+                'merge_config': merge_config,
+                'merged_files_count': len(merged_files)
+            }
+            
+            metadata_path = os.path.join(merge_dir, "merge_metadata.json")
+            with open(metadata_path, 'w') as f:
+                json.dump(merge_metadata, f, indent=2)
+            
+            # Générer un rapport de fusion
+            report_path = os.path.join(merge_dir, "merge_report.md")
+            self._generate_merge_report(merge_metadata, archives, report_path)
+            
+            logger.info(f"Fusion terminée: {merge_id}")
+            logger.info(f"{len(archives)} sessions fusionnées dans {merge_dir}")
+            
+            return {
+                'success': True,
+                'merge_id': merge_id,
+                'merge_directory': merge_dir,
+                'merged_sessions': len(archives),
+                'metadata_path': metadata_path,
+                'report_path': report_path
+            }
+            
+        except Exception as e:
+            logger.error(f"Erreur lors de la fusion des sessions: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return None
+    
+    def _generate_merge_report(self, merge_metadata: Dict[str, Any], archives: List[Dict[str, Any]],
+                             report_path: str) -> None:
+        """Génère un rapport Markdown détaillant la fusion."""
+        with open(report_path, 'w', encoding='utf-8') as f:
+            f.write(f"# Rapport de fusion de sessions\n\n")
+            f.write(f"**ID de fusion**: {merge_metadata['merge_id']}\n")
+            f.write(f"**Date**: {merge_metadata['timestamp']}\n")
+            f.write(f"**Sessions fusionnées**: {len(archives)}\n\n")
+            
+            f.write("## Sessions sources\n")
+            for i, archive in enumerate(archives):
+                metadata = archive['metadata']
+                f.write(f"### Session {i+1}: {metadata.get('session_id', 'unknown')}\n")
+                f.write(f"- Modèle: {metadata.get('model_type', 'N/A')}\n")
+                f.write(f"- Épisodes: {metadata.get('total_episodes', 'N/A')}\n")
+                f.write(f"- Winrate: {metadata.get('win_rate', 'N/A')}\n")
+                f.write(f"- Fichiers: {len(archive['files'].get('model_files', []))} modèles\n\n")
+            
+            f.write("## Configuration de fusion\n")
+            f.write(f"```json\n{json.dumps(merge_metadata['merge_config'], indent=2)}\n```\n\n")
+            
+            f.write("## Recommandations\n")
+            f.write("1. Analyser les différences entre les sessions avec `compare_sessions()`\n")
+            f.write("2. Vérifier la compatibilité des modèles avant de les combiner\n")
+            f.write("3. Tester la fusion sur un sous-ensemble de données avant déploiement\n")
+            
+            f.write("\n## Fichiers fusionnés\n")
+            f.write(f"Total: {merge_metadata['merged_files_count']} fichiers\n")
