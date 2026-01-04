@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from backend.config import settings
-from backend.api.v1.endpoints import experiments, training, environment, visualization, archives
+from backend.api.v1.endpoints import experiments, training, environment, visualization, archives, intelligence
 from backend.services.websocket_service import WebSocketManager
 
 # Configuration du logging
@@ -69,6 +69,7 @@ app.include_router(training.router, prefix="/api/v1/training", tags=["training"]
 app.include_router(environment.router, prefix="/api/v1/environment", tags=["environment"])
 app.include_router(visualization.router, prefix="/api/v1/visualization", tags=["visualization"])
 app.include_router(archives.router, prefix="/api/v1/archives", tags=["archives"])
+app.include_router(intelligence.router, prefix="/api/v1/intelligence", tags=["intelligence"])
 
 @app.get("/")
 async def root():
@@ -82,7 +83,8 @@ async def root():
             "training": "/api/v1/training",
             "environment": "/api/v1/environment",
             "visualization": "/api/v1/visualization",
-            "archives": "/api/v1/archives"
+            "archives": "/api/v1/archives",
+            "intelligence": "/api/v1/intelligence"
         }
     }
 

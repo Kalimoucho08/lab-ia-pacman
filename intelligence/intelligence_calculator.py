@@ -195,3 +195,241 @@ class IntelligenceCalculator:
         if mean_reward <= baseline:
             return 0.0
         
+        normalized = (mean_reward - baseline) / (max_theoretical - baseline)
+        
+        # Appliquer une fonction sigmoïde pour pénaliser la variance
+        if std_reward > 0:
+            penalty = 1.0 / (1.0 + np.exp((std_reward - 50) / 20))  # Pénalise les fortes variances
+            normalized *= penalty
+        
+        return max(0.0, min(1.0, normalized))
+    
+    def _normalize_survival(self, episodes: List[EpisodeMetrics]) -> float:
+        """
+        Normalise la survie moyenne.
+        
+        Survie = steps / max_possible_steps, moyenné sur tous les épisodes.
+        """
+        survival_ratios = []
+        for episode in episodes:
+            if episode.max_possible_steps > 0:
+                ratio = episode.steps / episode.max_possible_steps
+                survival_ratios.append(ratio)
+        
+        if not survival_ratios:
+            return 0.0
+        
+        avg_survival = np.mean(survival_ratios)
+        return max(0.0, min(1.0, avg_survival))
+    
+    def _calculate_efficiency(self, episodes: List[EpisodeMetrics]) -> float:
+        """Calcule l'efficacité de collecte des pellets."""
+        efficiencies = []
+        for episode in episodes:
+            if episode.total_pellets > 0:
+                efficiency = episode.pellets_collected / episode.total_pellets
+                efficiencies.append(efficiency)
+        
+        if not efficiencies:
+            return 0.0
+        
+        return np.mean(efficiencies)
+    
+    def _calculate_consistency(self, rewards: List[float]) -> float:
+        """Calcule la consistance (1 - coefficient de variation)."""
+        if len(rewards) < 2 or np.mean(rewards) == 0:
+            return 0.5  # Valeur par défaut
+        
+        cv = np.std(rewards) / np.mean(rewards)  # Coefficient de variation
+        consistency = 1.0 / (1.0 + cv)  # Transforme en score 0-1
+        return max(0.0, min(1.0, consistency))
+    
+    def _calculate_learning_trend(self, rewards: List[float]) -> float:
+        """Calcule la tendance d'apprentissage (pente de régression linéaire)."""
+        if len(rewards) < 3:
+            return 0.0
+        
+        # Utiliser une régression linéaire simple
+        x = np.arange(len(rewards))
+        y = np.array(rewards)
+        
+        # Calculer la pente
+        A = np.vstack([x, np.ones(len(x))]).T
+        slope, _ = np.linalg.lstsq(A, y, rcond=None)[0]
+        
+        # Normaliser la pente
+        max_slope = np.std(y) * 2  # Pente maximale attendue
+        if max_slope == 0:
+            return 0.0
+        
+        normalized_slope = slope / max_slope
+        return max(-1.0, min(1.0, normalized_slope))
+    
+    def _adjust_for_difficulty(self, score: float, difficulty_factor: float) -> float:
+        """
+        Ajuste le score selon la difficulté de l'environnement.
+        
+        Args:
+            score: Score original (0-100)
+            difficulty_factor: Facteur de difficulté (>1 = plus difficile)
+            
+        Returns:
+            Score ajusté (0-100)
+        """
+        if difficulty_factor <= 1.0:
+            return score
+        
+        # Formule d'ajustement: score * (1 + log(difficulty_factor))
+        # Cela récompense les performances dans des environnements difficiles
+        adjustment = 1.0 + np.log(difficulty_factor) / 10.0
+        adjusted = score * adjustment
+        
+        return min(100.0, adjusted)
+    
+    def _generate_explanation(self, components: IntelligenceComponents, 
+                            score: float, difficulty_factor: float) -> str:
+        """Génère une explication textuelle du score."""
+        explanations = []
+        
+        # Évaluation globale
+        if score >= 80:
+            explanations.append("Performance exceptionnelle ! L'agent démontre une intelligence avancée.")
+        elif score >= 60:
+            explanations.append("Bonne performance. L'agent montre une compréhension solide du jeu.")
+        elif score >= 40:
+            explanations.append("Performance moyenne. L'agent a des bases mais peut s'améliorer.")
+        elif score >= 20:
+            explanations.append("Performance faible. L'agent a du mal avec les mécaniques de base.")
+        else:
+            explanations.append("Performance très faible. L'agent ne comprend pas le jeu.")
+        
+        # Points forts
+        strengths = []
+        if components.winrate >= 0.7:
+            strengths.append("taux de victoire élevé")
+        if components.reward_normalized >= 0.7:
+            strengths.append("récompenses importantes")
+        if components.survival_normalized >= 0.7:
+            strengths.append("bonne survie")
+        if components.efficiency >= 0.7:
+            strengths.append("efficacité de collecte")
+        
+        if strengths:
+            explanations.append(f"Points forts: {', '.join(strengths)}.")
+        
+        # Points faibles
+        weaknesses = []
+        if components.winrate <= 0.3:
+            weaknesses.append("taux de victoire bas")
+        if components.reward_normalized <= 0.3:
+            weaknesses.append("récompenses faibles")
+        if components.survival_normalized <= 0.3:
+            weaknesses.append("survie limitée")
+        if components.consistency <= 0.3:
+            weaknesses.append("inconsistance")
+        
+        if weaknesses:
+            explanations.append(f"Points à améliorer: {', '.join(weaknesses)}.")
+        
+        # Tendance d'apprentissage
+        if components.learning_trend > 0.1:
+            explanations.append("L'agent montre une nette amélioration au fil du temps.")
+        elif components.learning_trend < -0.1:
+            explanations.append("Attention: l'agent régresse au lieu de s'améliorer.")
+        
+        # Difficulté
+        if difficulty_factor > 1.5:
+            explanations.append(f"Performance remarquable compte tenu de la difficulté élevée (facteur: {difficulty_factor:.1f}x).")
+        
+        return " ".join(explanations)
+    
+    def _generate_recommendations(self, components: IntelligenceComponents) -> List[str]:
+        """Génère des recommandations pour améliorer l'agent."""
+        recommendations = []
+        
+        if components.winrate < 0.5:
+            recommendations.append("Augmenter l'exploration pour découvrir de meilleures stratégies.")
+        
+        if components.reward_normalized < 0.5:
+            recommendations.append("Ajuster la fonction de récompense pour mieux guider l'apprentissage.")
+        
+        if components.survival_normalized < 0.5:
+            recommendations.append("Renforcer l'apprentissage de l'évitement des fantômes.")
+        
+        if components.efficiency < 0.5:
+            recommendations.append("Améliorer la planification du chemin pour collecter plus de pellets.")
+        
+        if components.consistency < 0.5:
+            recommendations.append("Stabiliser l'apprentissage avec un taux d'apprentissage plus faible.")
+        
+        if components.learning_trend < 0:
+            recommendations.append("Réviser les hyperparamètres, l'agent régresse au lieu de progresser.")
+        
+        if not recommendations:
+            recommendations.append("Continuer l'entraînement actuel, l'agent progresse bien.")
+        
+        return recommendations
+    
+    def _empty_score(self) -> Dict[str, Any]:
+        """Retourne un score vide lorsque aucune donnée n'est disponible."""
+        return {
+            'overall_score': 0.0,
+            'detailed_score': 0.0,
+            'components': {
+                'winrate': 0.0,
+                'reward_normalized': 0.0,
+                'survival_normalized': 0.0,
+                'efficiency': 0.0,
+                'consistency': 0.0,
+                'learning_trend': 0.0
+            },
+            'raw_metrics': {
+                'total_episodes': 0,
+                'wins': 0,
+                'avg_reward': 0.0,
+                'avg_steps': 0.0,
+                'avg_pellets_collected': 0.0
+            },
+            'explanation': "Aucune donnée disponible pour calculer le score d'intelligence.",
+            'recommendations': ["Collecter des données d'entraînement pour évaluer l'agent."],
+            'difficulty_factor': 1.0,
+            'calculated_at': datetime.now().isoformat()
+        }
+
+
+# Fonction utilitaire pour créer des EpisodeMetrics à partir des données du backend
+def create_episode_metrics_from_backend(episode_data: List[Dict[str, Any]]) -> List[EpisodeMetrics]:
+    """
+    Convertit les données d'épisode du backend en objets EpisodeMetrics.
+    
+    Args:
+        episode_data: Liste de dictionnaires avec les clés:
+            - episode: numéro d'épisode
+            - reward: récompense totale
+            - steps: nombre de steps
+            - win: booléen de victoire
+            - pellets_collected: pellets collectés
+            - total_pellets: pellets totaux
+            - ghosts_eaten: fantômes mangés
+            - deaths: morts
+            - max_steps: steps maximum possibles (optionnel)
+            
+    Returns:
+        Liste d'objets EpisodeMetrics
+    """
+    episodes = []
+    for data in episode_data:
+        episode = EpisodeMetrics(
+            episode=data.get('episode', 0),
+            reward=data.get('reward', 0.0),
+            steps=data.get('steps', 0),
+            win=data.get('win', False),
+            pellets_collected=data.get('pellets_collected', 0),
+            total_pellets=data.get('total_pellets', 1),
+            ghosts_eaten=data.get('ghosts_eaten', 0),
+            deaths=data.get('deaths', 0),
+            max_possible_steps=data.get('max_steps', data.get('max_possible_steps', 1000))
+        )
+        episodes.append(episode)
+    
+    return episodes
