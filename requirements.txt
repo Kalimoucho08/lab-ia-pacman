@@ -16,4 +16,4 @@ supersuit>=3.8.0  # wrappers pour PettingZoo
 pygame-ce>=2.5.0
 
 # Utilitaires
-tkinter  # inclus dans Python standard
+# tkinter  # inclus dans Python standard (ne pas installer via pip)
