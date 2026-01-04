@@ -1,11 +1,12 @@
 # regles_environnement_travail.md
 
-Règles spécifiques au projet lab-ia-pacman et à son environnement de travail (Windows, Python 3.14, VS Code).
+Règles spécifiques au projet lab-ia-pacman et à son environnement de travail (Windows, Python 3.11, VS Code).
 
 ## Lignes directrices
 
 - Le répertoire racine est `g:/Drive/bogny/projet-ia-code/lab-ia-pacman`. Utiliser des chemins relatifs à partir de là.
 - La console Windows utilise CP1252 : interdiction d'utiliser des caractères Unicode dans les `print` et logs de l'interface. Les fichiers sources doivent être encodés en UTF-8.
+- **Utiliser l'environnement virtuel `venv311` (Python 3.11.9) pour le projet lab-ia-pacman.** L'environnement `venv` (Python 3.14.2) est présent mais non utilisé. Vérifier que `venv311` est activé avant d'exécuter des scripts.
 - Les environnements multi‑agent sont définis dans `src/pacman_env/multiagent_env.py` et `src/pacman_env/multiagent_wrappers.py`.
 - Les boutons "Entraîner Pac‑Man" et "Entraîner les fantômes" doivent lancer un thread séparé pour ne pas bloquer l'interface Tkinter. Vérifier que le thread est `daemon=True` et arrêter proprement l'entraînement si nécessaire.
 - Les modèles sauvegardés doivent être placés dans `logs/` avec un nom explicite (ex: `pacman_DQN_<timestamp>.zip`). Inclure les métadonnées (algorithme, paramètres) dans le nom ou un fichier adjacent.
@@ -26,3 +27,4 @@ Règles spécifiques au projet lab-ia-pacman et à son environnement de travail 
 - Les tests unitaires doivent être placés dans `tests/` et exécutables avec `pytest`. Utiliser des fixtures pour les environnements communs.
 - Les dépendances doivent être listées dans `requirements.txt` et `pyproject.toml`. Vérifier la compatibilité avec Python 3.14.
 - Les scripts de démarrage (`.bat`) doivent utiliser l'environnement virtuel activé. Vérifier la présence de `venv` avant d'exécuter.
+- **Interdiction stricte des caractères Unicode dans les messages `print`, logs, commandes exécutées et noms de fichiers temporaires.** Utiliser uniquement des caractères ASCII pour éviter les erreurs d'encodage CP1252.
