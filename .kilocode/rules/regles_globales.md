@@ -13,6 +13,10 @@ Règles générales applicables à toutes les tâches exécutées par Kilo Code.
 - Commenter les modifications importantes dans le code et inclure des docstrings.
 - Attraper les exceptions dans les scripts de test et afficher un message clair.
 - Apprendre de ses erreurs : après chaque erreur identifiée, mettre à jour les fichiers de règles (`regles_globales.md` et `regles_environnement_travail.md`) pour inclure une nouvelle ligne directrice ou clarifier une existante.
+- Lors de la lecture de fichiers compressés (gzip) avec Python, si la sortie `print` n'apparaît pas, utiliser `sys.stdout.buffer.write(data)` pour écrire les bytes bruts directement.
+- Préférer les commandes Python aux commandes shell spécifiques (PowerShell, cmd) pour les opérations de système sous Windows, car elles sont plus portables et évitent les problèmes de shell.
+- Vérifier la syntaxe des commandes Python à une ligne avant exécution ; utiliser des blocs multilignes si nécessaire.
+- En cas d'absence de sortie après une commande `execute_command`, vérifier si le fichier est vide, puis essayer d'écrire directement les bytes ou changer d'encodage.
 - Éviter les commandes Unix incompatibles avec Windows (head, grep, tail, etc.) dans `execute_command`. Utiliser des commandes PowerShell natives ou des alternatives Python.
 - Préférer les chemins relatifs aux chemins absolus. Utiliser `os.path.join` pour la portabilité.
 - Les noms de fichiers et de répertoires doivent être en minuscules, sans espaces, avec des underscores pour la séparation.
