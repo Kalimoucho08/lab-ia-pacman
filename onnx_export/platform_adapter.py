@@ -349,78 +349,6 @@ class PlatformAdapter:
         # Vérifier les types de données
         for tensor in self.model.graph.initializer:
             if tensor.data_type not in [1, 7]:  # FLOAT, FLOAT16
-            from onnxruntime.transformers import optimizer
-            from onnxruntime.transformers.fusion_options import FusionOptions
-            
-            # Options d'optimisation
-            opt_options = FusionOptions(target.device)
-            
-            # Optimiser le modèle
-            optimized_model = optimizer.optimize_model(
-                model_path,
-                model_type='bert',  # Type générique
-                num_heads=0,  # Non applicable
-                hidden_size=0,
-                optimization_options=opt_options
-            )
-            
-            optimized_model.save_model_to_file(optimized_path)
-            print(f"Modèle optimisé pour {target}: {optimized_path}")
-            
-        except ImportError:
-            print("Avertissement: ONNX Runtime Transformer Optimizer non disponible")
-            print("Utilisation du modèle original")
-            shutil.copy2(model_path, optimized_path)
-        
-        return optimized_path
-    
-    def _optimize_for_web(self, input_path: str, output_path: str):
-        """
-        Optimise le modèle pour le web (réduction de taille, compatibilité).
-        
-        Args:
-            input_path: Chemin d'entrée
-            output_path: Chemin de sortie
-        """
-        model = onnx.load(input_path)
-        
-        # Simplifier le modèle (fusion d'opérations, etc.)
-        try:
-            import onnxsim
-            model_simp, check = onnxsim.simplify(model)
-            if check:
-                onnx.save(model_simp, output_path)
-                print(f"Modèle simplifié pour le web: {output_path}")
-                return
-        except ImportError:
-            pass
-        
-        # Fallback: copier le modèle original
-        shutil.copy2(input_path, output_path)
-    
-    def _check_barracuda_compatibility(self) -> Dict[str, Any]:
-        """
-        Vérifie la compatibilité du modèle avec Barracuda.
-        
-        Returns:
-            Dictionnaire avec résultats de compatibilité
-        """
-        issues = []
-        
-        # Vérifier les opérations supportées par Barracuda
-        # Liste des opérations potentiellement problématiques
-        problematic_ops = [
-            "RandomNormal", "RandomUniform", "Dropout",
-            "Loop", "Scan", "If", "Sequence"
-        ]
-        
-        for node in self.model.graph.node:
-            if node.op_type in problematic_ops:
-                issues.append(f"Opération {node.op_type} peut être incompatible")
-        
-        # Vérifier les types de données
-        for tensor in self.model.graph.initializer:
-            if tensor.data_type not in [1, 7]:  # FLOAT, FLOAT16
                 issues.append(f"Type de données non supporté: {tensor.data_type}")
         
         return {
@@ -442,11 +370,8 @@ class PlatformAdapter:
             Chemin du modèle compatible
         """
         # Pour l'instant, simplement copier le modèle
-        # Dans une implémentation réelle, appliquer des transformations
         shutil.copy2(input_path, output_path)
         return output_path
-    
-    # Méthodes de génération de wrappers (implémentations simplifiées)
     
     def _generate_pygame_wrapper(self, output_path: str, model_path: str):
         """Génère un wrapper Python pour Pygame."""
@@ -472,39 +397,156 @@ class PacManONNXInference:
         self.input_name = self.session.get_inputs()[0].name
         self.output_name = self.session.get_outputs()[0].name
         
-        # Métadonnées d'environnement (à adapter)
-        self.grid_size = 10
-        self.num_actions = 4  # Haut, Bas, Gauche, Droite
-        
-    def preprocess_observation(self, observation):
-        """
-        Prétraite l'observation pour l'inférence.
-        
-        Args:
-            observation: Observation brute du jeu
-            
-        Returns:
-            Observation prétraitée
-        """
-        # Convertir en tableau numpy et ajouter une dimension batch
-        obs_array = np.array(observation, dtype=np.float32)
-        if len(obs_array.shape) == 1:
-            obs_array = obs_array.reshape(1, -1)
-        elif len(obs_array.shape) == 3:
-            # Image: (H, W, C) -> (1, C, H, W)
-            obs_array = np.transpose(obs_array, (2, 0, 1))
-            obs_array = np.expand_dims(obs_array, axis=0)
-        
-        return obs_array
-    
     def predict(self, observation):
         """
         Prédit l'action à partir d'une observation.
         
         Args:
-            observation: Observation du jeu
+            observation: Observation du jeu (tableau numpy)
             
         Returns:
             Action prédite (indice)
         """
-        # Pr
+        # Ajouter une dimension batch si nécessaire
+        if len(observation.shape) == 1:
+            observation = observation.reshape(1, -1)
+        
+        # Inférence
+        outputs = self.session.run(
+            [self.output_name],
+            {self.input_name: observation.astype(np.float32)}
+        )
+        
+        # Extraire l'action (supposer que la sortie est logits)
+        action_logits = outputs[0][0]
+        action = np.argmax(action_logits)
+        
+        return action
+    
+    def predict_batch(self, observations):
+        """
+        Prédit des actions pour un batch d'observations.
+        
+        Args:
+            observations: Batch d'observations
+            
+        Returns:
+            Actions prédites
+        """
+        outputs = self.session.run(
+            [self.output_name],
+            {self.input_name: observations.astype(np.float32)}
+        )
+        
+        actions = np.argmax(outputs[0], axis=1)
+        return actions
+
+
+# Exemple d'utilisation
+if __name__ == "__main__":
+    # Charger le modèle
+    model = PacManONNXInference("model.onnx")
+    
+    # Exemple d'observation (à adapter selon votre environnement)
+    dummy_obs = np.random.randn(1, 100).astype(np.float32)  # Exemple: 100 features
+    
+    # Prédiction
+    action = model.predict(dummy_obs)
+    print(f"Action prédite: {action}")
+'''
+        
+        with open(output_path, 'w') as f:
+            f.write(wrapper_code)
+        
+        print(f"Wrapper Pygame généré: {output_path}")
+    
+    def export_all_platforms(
+        self,
+        base_output_dir: str,
+        platforms: List[str] = None
+    ) -> Dict[str, Dict[str, str]]:
+        """
+        Exporte le modèle pour toutes les plateformes supportées.
+        
+        Args:
+            base_output_dir: Répertoire de base de sortie
+            platforms: Liste des plateformes (défaut: toutes)
+            
+        Returns:
+            Dictionnaire avec résultats par plateforme
+        """
+        if platforms is None:
+            platforms = ["pygame", "web", "unity", "generic"]
+        
+        results = {}
+        
+        for platform in platforms:
+            platform_dir = os.path.join(base_output_dir, platform)
+            os.makedirs(platform_dir, exist_ok=True)
+            
+            try:
+                if platform == "pygame":
+                    platform_results = self.adapt_for_pygame(platform_dir)
+                elif platform == "web":
+                    platform_results = self.adapt_for_web(platform_dir)
+                elif platform == "unity":
+                    platform_results = self.adapt_for_unity(platform_dir)
+                elif platform == "generic":
+                    platform_results = self.adapt_for_generic(platform_dir)
+                else:
+                    print(f"Plateforme non supportée ignorée: {platform}")
+                    continue
+                
+                results[platform] = platform_results
+                
+            except Exception as e:
+                print(f"Erreur lors de l'adaptation pour {platform}: {e}")
+                results[platform] = {"error": str(e)}
+        
+        # Générer un rapport d'export
+        report_path = os.path.join(base_output_dir, "export_report.json")
+        with open(report_path, 'w') as f:
+            json.dump(results, f, indent=2)
+        
+        print(f"Rapport d'export généré: {report_path}")
+        return results
+
+
+def adapt_model_cli():
+    """Interface en ligne de commande pour l'adaptation de modèles."""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Adapter un modèle ONNX pour différentes plateformes")
+    parser.add_argument("onnx_model", help="Chemin vers le modèle ONNX")
+    parser.add_argument("--output_dir", default="./platform_exports", help="Répertoire de sortie")
+    parser.add_argument("--platforms", nargs="+",
+                       choices=["pygame", "web", "unity", "generic", "all"],
+                       default=["all"], help="Plateformes cibles")
+    
+    args = parser.parse_args()
+    
+    # Convertir "all" en liste de toutes les plateformes
+    if "all" in args.platforms:
+        args.platforms = ["pygame", "web", "unity", "generic"]
+    
+    adapter = PlatformAdapter(args.onnx_model)
+    
+    # Exporter pour toutes les plateformes demandées
+    results = adapter.export_all_platforms(args.output_dir, args.platforms)
+    
+    print("\n" + "="*50)
+    print("Adaptation multi-plateforme terminée!")
+    print(f"Résultats sauvegardés dans: {args.output_dir}")
+    
+    # Afficher un résumé
+    for platform, result in results.items():
+        if "error" in result:
+            print(f"  {platform}: ÉCHEC - {result['error']}")
+        else:
+            print(f"  {platform}: SUCCÈS - {result.get('onnx_model', 'N/A')}")
+    
+    print("="*50)
+
+
+if __name__ == "__main__":
+    adapt_model_cli()
