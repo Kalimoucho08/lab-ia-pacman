@@ -440,4 +440,4 @@ if __name__ == "__main__":
             archive_path_b: Chemin vers la deuxième archive
             
         Returns:
-            Objet SessionComparison avec les différences et
+            Ob
