@@ -10,16 +10,16 @@
  * - InfoOverlay : overlay d'informations
  */
 
-import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Box, Paper, Typography, Alert, CircularProgress } from '@mui/material';
+import { Alert, Box, CircularProgress, Paper, Typography } from '@mui/material';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 // Import des sous-systèmes
-import { CanvasRenderer } from './CanvasRenderer';
-import { WebSocketClient } from './WebSocketClient';
-import { GameStateManager } from './GameStateManager';
 import { AnimationEngine } from './AnimationEngine';
+import { CanvasRenderer } from './CanvasRenderer';
 import ControlsPanel from './ControlsPanel';
+import { GameStateManager } from './GameStateManager';
 import InfoOverlay from './InfoOverlay';
+import { WebSocketClient } from './WebSocketClient';
 
 // Types
 import { GameState, RenderConfig } from '../../types/pacman';
@@ -110,6 +110,11 @@ const GameVisualizer: React.FC = () => {
     // Note: WebSocketClient n'a pas de callback générique onMessage,
     // donc pour performance_stats, il faudrait soit l'ajouter soit utiliser un autre mécanisme
     // Pour l'instant, on ignore performance_stats
+    
+    // Connexion WebSocket
+    wsClient.connect().catch((error) => {
+      console.error('Échec de connexion WebSocket:', error);
+    });
     
     // Démarrer la boucle de rendu
     let animationFrameId: number;

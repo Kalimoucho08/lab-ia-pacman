@@ -1,21 +1,23 @@
-import React, { useEffect, useRef } from 'react'
-import { Box, Paper, Typography, ToggleButton, ToggleButtonGroup } from '@mui/material'
-import TrendingUpIcon from '@mui/icons-material/TrendingUp'
-import ShowChartIcon from '@mui/icons-material/ShowChart'
 import BarChartIcon from '@mui/icons-material/BarChart'
+import ShowChartIcon from '@mui/icons-material/ShowChart'
 import TimelineIcon from '@mui/icons-material/Timeline'
+import TrendingUpIcon from '@mui/icons-material/TrendingUp'
+import { Box, Paper, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material'
 import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler,
+    BarController,
+    BarElement,
+    CategoryScale,
+    Chart as ChartJS,
+    Filler,
+    Legend,
+    LinearScale,
+    LineController,
+    LineElement,
+    PointElement,
+    Title,
+    Tooltip,
 } from 'chart.js'
+import React, { useEffect, useRef } from 'react'
 
 // Enregistrer les composants Chart.js
 ChartJS.register(
@@ -27,7 +29,9 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  Filler
+  Filler,
+  LineController,
+  BarController
 )
 
 const Charts: React.FC = () => {
