@@ -1,0 +1,13 @@
+{
+  "session_a_id": "unknown",
+  "session_b_id": "unknown",
+  "parameter_diffs": {},
+  "metric_diffs": {},
+  "compatibility_score": 1.0,
+  "recommendations": [
+    "Sessions tr\u00e8s compatibles - fusion recommand\u00e9e"
+  ],
+  "archive_path_a": "C:\\Users\\jdema\\AppData\\Local\\Temp\\tmp88t7y5k7\\archive1.zip",
+  "archive_path_b": "C:\\Users\\jdema\\AppData\\Local\\Temp\\tmp88t7y5k7\\archive2.zip",
+  "comparison_timestamp": "20260104_125104"
+}

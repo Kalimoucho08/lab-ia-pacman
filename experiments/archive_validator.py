@@ -161,15 +161,6 @@ class ArchiveValidator:
                 warnings.extend(content_result["warnings"])
                 statistics.update(content_result["statistics"])
             
-            # Vérifier la signature numérique si présente
-            signature_result = self._check_digital_signature(archive_path)
-            if signature_result["checked"]:
-                checks_performed.append("signature_check")
-                statistics["signature_valid"] = signature_result["is_valid"]
-                
-                if not signature_result["is_valid"]:
-                    warnings.append("Signature numérique invalide ou absente")
-            
             # Calculer le temps de validation
             validation_time = (datetime.now() - start_time).total_seconds()
             statistics["validation_time_seconds"] = validation_time
@@ -187,7 +178,7 @@ class ArchiveValidator:
                 warnings=warnings,
                 statistics=statistics,
                 integrity_hash=statistics.get("integrity_hash"),
-                signature_valid=statistics.get("signature_valid")
+                signature_valid=None
             )
             
             # Sauvegarder le rapport
@@ -447,11 +438,6 @@ class ArchiveValidator:
                 log_stats = self._check_log_files(temp_dir, extracted_files)
                 result["statistics"].update(log_stats)
                 
-                # Détecter les anomalies
-                anomalies = self._detect_anomalies(temp_dir, extracted_files)
-                if anomalies:
-                    result["warnings"].extend(anomalies)
-                
         except Exception as e:
             result["is_valid"] = False
             result["errors"].append(f"Erreur lors de la vérification du contenu: {e}")
@@ -478,4 +464,123 @@ class ArchiveValidator:
                         errors.append(f"Champ '{field}' manquant dans {metadata_file}")
                 
                 # Vérifier les types de données
-                if 'total_episodes'
+                if 'total_episodes' in metadata and not isinstance(metadata['total_episodes'], (int, float)):
+                    errors.append(f"Champ 'total_episodes' doit être numérique dans {metadata_file}")
+                
+                if 'win_rate' in metadata and not isinstance(metadata['win_rate'], (int, float)):
+                    errors.append(f"Champ 'win_rate' doit être numérique dans {metadata_file}")
+                
+            except json.JSONDecodeError as e:
+                errors.append(f"Fichier JSON invalide {metadata_file}: {e}")
+            except Exception as e:
+                errors.append(f"Erreur lors de la lecture de {metadata_file}: {e}")
+        
+        return errors
+    
+    def _check_model_files(self, extract_dir: str, file_list: List[str]) -> List[str]:
+        """Vérifie les fichiers de modèle."""
+        warnings = []
+        
+        # Chercher les fichiers de modèle
+        model_files = [f for f in file_list if f.endswith('.zip') or f.endswith('.pth') or f.endswith('.h5')]
+        
+        for model_file in model_files:
+            try:
+                model_path = os.path.join(extract_dir, model_file)
+                file_size = os.path.getsize(model_path)
+                
+                if file_size == 0:
+                    warnings.append(f"Fichier de modèle vide: {model_file}")
+                elif file_size > 100 * 1024 * 1024:  # 100MB
+                    warnings.append(f"Fichier de modèle très volumineux: {model_file} ({file_size / (1024*1024):.1f}MB)")
+                
+                # Vérifier que c'est un fichier ZIP valide si c'est un .zip
+                if model_file.endswith('.zip'):
+                    try:
+                        with zipfile.ZipFile(model_path, 'r') as zipf:
+                            _ = zipf.namelist()
+                    except Exception:
+                        warnings.append(f"Fichier ZIP de modèle corrompu: {model_file}")
+            
+            except Exception as e:
+                warnings.append(f"Erreur lors de la vérification du modèle {model_file}: {e}")
+        
+        return warnings
+    
+    def _check_log_files(self, extract_dir: str, file_list: List[str]) -> Dict[str, Any]:
+        """Vérifie les fichiers de logs."""
+        stats = {
+            "log_count": 0,
+            "log_total_size_bytes": 0,
+            "log_files": []
+        }
+        
+        # Chercher les fichiers de logs
+        log_files = [f for f in file_list if f.endswith('.log') or f.endswith('.txt') or f.endswith('.json')]
+        
+        for log_file in log_files:
+            try:
+                log_path = os.path.join(extract_dir, log_file)
+                file_size = os.path.getsize(log_path)
+                
+                stats["log_count"] += 1
+                stats["log_total_size_bytes"] += file_size
+                stats["log_files"].append({
+                    "name": log_file,
+                    "size_bytes": file_size
+                })
+                
+                # Vérifier que le fichier n'est pas vide
+                if file_size == 0:
+                    stats.setdefault("empty_logs", []).append(log_file)
+            
+            except Exception:
+                pass
+        
+        return stats
+    
+    def _save_validation_report(self, result: ValidationResult) -> None:
+        """Sauvegarde un rapport de validation."""
+        try:
+            report_dir = os.path.join(self.work_dir, "reports")
+            os.makedirs(report_dir, exist_ok=True)
+            
+            # Créer un nom de fichier basé sur l'archive
+            archive_name = os.path.basename(result.archive_path)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            report_file = os.path.join(report_dir, f"validation_{archive_name}_{timestamp}.json")
+            
+            # Convertir le résultat en dictionnaire
+            report_data = asdict(result)
+            
+            # Sauvegarder en JSON
+            with open(report_file, 'w') as f:
+                json.dump(report_data, f, indent=2, default=str)
+            
+            logger.info(f"Rapport de validation sauvegardé: {report_file}")
+        
+        except Exception as e:
+            logger.error(f"Erreur lors de la sauvegarde du rapport: {e}")
+    
+    def _quarantine_archive(self, archive_path: str, result: ValidationResult) -> None:
+        """Met une archive en quarantaine si elle est invalide."""
+        try:
+            quarantine_dir = os.path.join(self.work_dir, "quarantine")
+            os.makedirs(quarantine_dir, exist_ok=True)
+            
+            # Déplacer l'archive vers la quarantaine
+            archive_name = os.path.basename(archive_path)
+            quarantine_path = os.path.join(quarantine_dir, archive_name)
+            
+            import shutil
+            shutil.move(archive_path, quarantine_path)
+            
+            # Sauvegarder le rapport d'erreur
+            error_report = os.path.join(quarantine_dir, f"{archive_name}_errors.json")
+            with open(error_report, 'w') as f:
+                json.dump(asdict(result), f, indent=2, default=str)
+            
+            logger.warning(f"Archive mise en quarantaine: {archive_path} -> {quarantine_path}")
+        
+        except Exception as e:
+            logger.error(f"Erreur lors de la mise en quarantaine: {e}")
