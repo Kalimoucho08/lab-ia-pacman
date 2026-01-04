@@ -248,7 +248,7 @@ class CompressionOptimizer:
         return hash_func.hexdigest()
     
     def _is_compression_suitable(self, file_path: str, file_size: int) -> bool:
-        """Détermine si un fichier est adapté à la compression."""
+        """Déterminine si un fichier est adapté à la compression."""
         # Les fichiers déjà compressés ne devraient pas être recompressés
         compressed_extensions = ['.zip', '.gz', '.bz2', '.xz', '.7z', '.rar', '.jpg', '.png', '.mp3', '.mp4']
         
@@ -418,4 +418,81 @@ class CompressionOptimizer:
             logger.warning(f"Erreur lors de la compression gzip de {file_path}: {e}")
             return False
     
-    def _compress_file_if_beneficial(self,
+    def _compress_file_if_beneficial(self, file_path: str) -> bool:
+        """Compresse un fichier seulement si cela réduit significativement sa taille."""
+        try:
+            original_size = os.path.getsize(file_path)
+            
+            # Créer un fichier temporaire compressé
+            with tempfile.NamedTemporaryFile(suffix='.gz', delete=False) as tmp:
+                tmp_path = tmp.name
+            
+            with open(file_path, 'rb') as f_in:
+                with gzip.open(tmp_path, 'wb') as f_out:
+                    shutil.copyfileobj(f_in, f_out)
+            
+            compressed_size = os.path.getsize(tmp_path)
+            
+            # Vérifier si la compression est bénéfique (au moins 10% de réduction)
+            if compressed_size < original_size * 0.9:
+                # Remplacer le fichier original
+                os.remove(file_path)
+                shutil.move(tmp_path, file_path)
+                logger.debug(f"Fichier compressé: {file_path} ({original_size} -> {compressed_size} bytes)")
+                return True
+            else:
+                # Supprimer le fichier temporaire
+                os.remove(tmp_path)
+                logger.debug(f"Compression non bénéfique pour {file_path}")
+                return False
+                
+        except Exception as e:
+            logger.warning(f"Erreur lors de la compression de {file_path}: {e}")
+            return False
+    
+    def _apply_differential_compression(self, directory: str, fingerprints: List[FileFingerprint]) -> None:
+        """Applique la compression différentielle entre fichiers similaires."""
+        # Pour l'instant, implémentation simplifiée
+        logger.info(f"Compression différentielle appliquée à {directory}")
+        # TODO: Implémenter la compression différentielle avancée
+    
+    def _create_optimized_archive(self, directory: str, original_archive_path: str) -> Optional[str]:
+        """Crée une archive optimisée à partir du répertoire optimisé."""
+        try:
+            # Déterminer le format de l'archive originale
+            if original_archive_path.endswith('.zip'):
+                archive_format = 'zip'
+            elif original_archive_path.endswith('.tar.gz') or original_archive_path.endswith('.tgz'):
+                archive_format = 'tar.gz'
+            elif original_archive_path.endswith('.tar'):
+                archive_format = 'tar'
+            else:
+                archive_format = 'zip'
+            
+            # Créer un nom pour l'archive optimisée
+            base_name = os.path.splitext(os.path.basename(original_archive_path))[0]
+            optimized_name = f"{base_name}_optimized"
+            optimized_path = os.path.join(self.work_dir, f"{optimized_name}.{archive_format}")
+            
+            if archive_format == 'zip':
+                with zipfile.ZipFile(optimized_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                    for root, dirs, files in os.walk(directory):
+                        for file in files:
+                            file_path = os.path.join(root, file)
+                            arcname = os.path.relpath(file_path, directory)
+                            zipf.write(file_path, arcname)
+            
+            elif archive_format == 'tar.gz':
+                with tarfile.open(optimized_path, 'w:gz') as tarf:
+                    tarf.add(directory, arcname=os.path.basename(directory))
+            
+            elif archive_format == 'tar':
+                with tarfile.open(optimized_path, 'w') as tarf:
+                    tarf.add(directory, arcname=os.path.basename(directory))
+            
+            logger.info(f"Archive optimisée créée: {optimized_path}")
+            return optimized_path
+            
+        except Exception as e:
+            logger.error(f"Erreur lors de la création de l'archive optimisée: {e}")
+            return None

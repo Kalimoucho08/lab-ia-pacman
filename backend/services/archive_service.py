@@ -13,7 +13,7 @@ from typing import Dict, List, Optional, Any
 from pathlib import Path
 
 from backend.config import settings
-from experiments.archive_service import IntelligentArchiveService
+from experiments.archive_service import IntelligentArchiveService, ArchiveConfig
 from experiments.metadata_generator import IntelligentMetadataGenerator
 from experiments.session_resumer import SessionResumer
 from experiments.version_manager import VersionManager
@@ -31,11 +31,24 @@ class ArchiveService:
         self.base_dir = settings.ARCHIVE_DIR if hasattr(settings, 'ARCHIVE_DIR') else "experiments/archives"
         self.logs_dir = settings.LOGS_DIR if hasattr(settings, 'LOGS_DIR') else "logs"
         
-        # Initialiser les composants
-        self.archive_service = IntelligentArchiveService(
-            base_dir=self.base_dir,
-            logs_dir=self.logs_dir
+        # Créer la configuration pour le service d'archivage
+        archive_config = ArchiveConfig(
+            archive_dir=self.base_dir,
+            max_archives=100,
+            auto_save_interval=1000,
+            save_on_improvement=True,
+            improvement_threshold=0.05,
+            compression_level=9,
+            include_model=True,
+            include_logs=True,
+            include_metrics=True,
+            include_config=True,
+            backup_to_cloud=False,
+            cloud_endpoint=None
         )
+        
+        # Initialiser les composants
+        self.archive_service = IntelligentArchiveService(config=archive_config)
         self.metadata_generator = IntelligentMetadataGenerator()
         self.session_resumer = SessionResumer()
         self.version_manager = VersionManager()

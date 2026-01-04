@@ -85,7 +85,8 @@ async def root():
             "environment": "/api/v1/environment",
             "visualization": "/api/v1/visualization",
             "archives": "/api/v1/archives",
-            "intelligence": "/api/v1/intelligence"
+            "intelligence": "/api/v1/intelligence",
+            "onnx": "/api/v1/onnx"
         }
     }
 
